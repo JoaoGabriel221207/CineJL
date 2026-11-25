@@ -12,6 +12,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- PeerJS for Real P2P Data & WebRTC Media Streaming -->
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -190,11 +192,11 @@
                 </div>
             </div>
 
-            <!-- Info Banner about Multi-Tab Testing -->
+            <!-- Info Banner about Real P2P Cross-Device Sync -->
             <div class="mt-8 p-4 rounded-xl bg-cinema-900/60 border border-cinema-800 flex items-start sm:items-center gap-3.5 text-xs sm:text-sm text-gray-400">
-                <i data-lucide="info" class="w-5 h-5 text-indigo-400 shrink-0 mt-0.5 sm:mt-0"></i>
+                <i data-lucide="globe" class="w-5 h-5 text-emerald-400 shrink-0 mt-0.5 sm:mt-0"></i>
                 <p>
-                    <strong class="text-gray-200">Dica de Teste em Tempo Real:</strong> Crie uma sala nesta aba e, em seguida, abra este mesmo arquivo em uma <span class="text-indigo-400 font-medium">segunda aba do navegador</span> inserindo o código gerado para testar a sincronização instantânea de vídeo e chat!
+                    <strong class="text-gray-200">Conexão Direta P2P (WebRTC):</strong> Agora você pode assistir com amigos em <span class="text-emerald-400 font-medium">qualquer navegador, celular ou computador</span>! O vídeo e o chat são transmitidos diretamente do Host para todos os convidados da sala.
                 </p>
             </div>
         </div>
@@ -231,22 +233,34 @@
                 <div id="role-badge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold">
                     <!-- Populated dynamically -->
                 </div>
+
+                <!-- Network / P2P Connection Status Pill -->
+                <div id="network-status-pill" class="hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-cinema-800 border border-cinema-700 text-gray-300">
+                    <span id="network-status-dot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                    <span id="network-status-text">Conectando P2P...</span>
+                </div>
             </div>
 
-            <!-- Right: Viewers Count, Simulate Guest & Leave -->
+            <!-- Right: Viewers Count, Force Sync / Reconnect & Leave -->
             <div class="flex items-center gap-2 sm:gap-3">
                 <!-- Online Viewers Counter -->
-                <div class="flex items-center gap-2 bg-cinema-800/80 border border-cinema-700/80 px-3 py-1.5 rounded-xl text-xs font-medium text-gray-300" title="Espectadores conectados na sala">
+                <div id="viewers-pill" class="flex items-center gap-2 bg-cinema-800/80 border border-cinema-700/80 px-3 py-1.5 rounded-xl text-xs font-medium text-gray-300 cursor-default" title="Espectadores conectados na sala">
                     <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                     <i data-lucide="users" class="w-3.5 h-3.5 text-gray-400"></i>
                     <span id="viewer-count">1</span>
                     <span class="hidden sm:inline">online</span>
                 </div>
 
-                <!-- Helper Button to Open Second Tab / Simulate Guest -->
-                <button id="btn-simulate-guest" title="Abre instruções ou nova janela para testar como Convidado" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs font-medium rounded-xl transition">
-                    <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
-                    Testar Convidado
+                <!-- Host: Force Sync Button -->
+                <button id="btn-force-sync" title="Reenviar estado atual e transmissão para todos os convidados" class="hidden items-center gap-1.5 px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs font-medium rounded-xl transition">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                    <span class="hidden sm:inline">Forçar Sincronização</span>
+                </button>
+
+                <!-- Guest: Reconnect Button (Shown on disconnect/error) -->
+                <button id="btn-reconnect" title="Tentar reconectar ao Host" class="hidden items-center gap-1.5 px-3 py-1.5 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 text-amber-300 text-xs font-medium rounded-xl transition">
+                    <i data-lucide="wifi" class="w-3.5 h-3.5"></i>
+                    <span>Reconectar</span>
                 </button>
 
                 <!-- Leave Room Button -->
@@ -263,15 +277,15 @@
             <!-- Left / Center: Video Theater Stage -->
             <section class="flex-1 flex flex-col bg-cinema-950 p-3 sm:p-5 overflow-y-auto">
                 
-                <!-- Host Upload Bar (Visible ONLY to Host) -->
-                <div id="host-upload-panel" class="hidden mb-4 bg-cinema-900 border border-cinema-800 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <!-- Host Upload Bar (Supports Drag & Drop + Button, Visible ONLY to Host) -->
+                <div id="host-upload-panel" class="hidden mb-4 bg-cinema-900 border-2 border-dashed border-cinema-700 hover:border-rose-500/60 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-colors">
                     <div class="flex items-center gap-3">
                         <div class="p-2.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-500 shrink-0">
                             <i data-lucide="upload-cloud" class="w-5 h-5"></i>
                         </div>
                         <div>
-                            <h3 class="text-sm font-semibold text-white">Carregar Vídeo na Sala</h3>
-                            <p id="file-info-text" class="text-xs text-gray-400">Formatos suportados: MP4, WebM, MKV, MOV • Limite máximo: <strong class="text-gray-200">5 GB</strong></p>
+                            <h3 class="text-sm font-semibold text-white">Carregar Vídeo na Sala (ou arraste aqui)</h3>
+                            <p id="file-info-text" class="text-xs text-gray-400">Formatos: MP4, WebM, MKV, MOV • Limite máximo: <strong class="text-gray-200">5 GB</strong></p>
                         </div>
                     </div>
 
@@ -284,13 +298,22 @@
                     </div>
                 </div>
 
-                <!-- Guest Sync Status Banner (Visible ONLY to Guest) -->
-                <div id="guest-status-banner" class="hidden mb-4 bg-indigo-950/40 border border-indigo-500/30 rounded-2xl px-4 py-3 flex items-center justify-between gap-3">
+                <!-- Guest Sync Status & Hybrid Local File Banner (Visible ONLY to Guest) -->
+                <div id="guest-status-banner" class="hidden mb-4 bg-indigo-950/40 border border-indigo-500/30 rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-3">
                     <div class="flex items-center gap-2.5 text-xs sm:text-sm text-indigo-200">
-                        <i data-lucide="radio" class="w-4 h-4 text-indigo-400 animate-pulse shrink-0"></i>
-                        <span>Modo Espectador: A reprodução é controlada em tempo real pelo <strong>Host da sala</strong>.</span>
+                        <i id="guest-banner-icon" data-lucide="radio" class="w-4 h-4 text-indigo-400 animate-pulse shrink-0"></i>
+                        <span id="guest-banner-text">Conectando ao Host da sala...</span>
                     </div>
-                    <span id="guest-file-badge" class="hidden text-xs font-mono bg-indigo-900/60 border border-indigo-500/30 px-2.5 py-1 rounded-lg text-indigo-300 truncate max-w-[200px]"></span>
+                    <div class="flex items-center gap-2">
+                        <span id="guest-file-badge" class="hidden text-xs font-mono bg-indigo-900/60 border border-indigo-500/30 px-2.5 py-1 rounded-lg text-indigo-300 truncate max-w-[180px]"></span>
+                        
+                        <!-- Optional Hybrid Mode: Guest can load local copy for native 4K quality -->
+                        <input type="file" id="guest-local-file-input" accept="video/*,.mkv,.mp4,.webm,.mov,.avi" class="hidden">
+                        <label for="guest-local-file-input" title="Opcional: Carregue o mesmo arquivo do seu PC para assistir em 4K nativo sincronizado pelos comandos do Host" class="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-1 bg-cinema-800 hover:bg-cinema-700 border border-cinema-600 text-gray-300 hover:text-white text-xs font-medium rounded-lg transition">
+                            <i data-lucide="hard-drive" class="w-3.5 h-3.5 text-indigo-400"></i>
+                            <span id="guest-local-label">Usar arquivo local</span>
+                        </label>
+                    </div>
                 </div>
 
                 <!-- Video Container Wrapper -->
@@ -298,7 +321,7 @@
                     
                     <!-- Empty State Placeholder (Before video is loaded) -->
                     <div id="video-placeholder" class="text-center p-6 max-w-md z-10">
-                        <div class="w-16 h-16 rounded-2xl bg-cinema-900 border border-cinema-800 flex items-center justify-center mx-auto mb-4 text-gray-500">
+                        <div id="placeholder-icon-box" class="w-16 h-16 rounded-2xl bg-cinema-900 border border-cinema-800 flex items-center justify-center mx-auto mb-4 text-gray-500">
                             <i data-lucide="clapperboard" class="w-8 h-8"></i>
                         </div>
                         <h4 id="placeholder-title" class="text-base sm:text-lg font-bold text-gray-200 mb-1">Nenhum vídeo carregado</h4>
@@ -312,8 +335,8 @@
 
                     <!-- Guest Sync Badge Overlay (Top Right inside Video) -->
                     <div id="video-sync-pill" class="hidden absolute top-4 right-4 bg-black/75 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-full flex items-center gap-2 text-xs font-medium text-emerald-400 z-20 pointer-events-none">
-                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                        Sincronizado com o Host
+                        <span id="video-sync-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                        <span id="video-sync-text">Sincronizado com o Host</span>
                     </div>
 
                     <!-- Custom Video Controls Overlay (Bottom) -->
@@ -386,7 +409,7 @@
                     <div class="flex items-center gap-3">
                         <span id="active-file-size" class="bg-cinema-900 border border-cinema-800 px-2.5 py-1 rounded-lg font-mono">0 MB</span>
                         <span id="sync-status-label" class="text-emerald-400 flex items-center gap-1">
-                            <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> Pronto
+                            <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> <span id="sync-mode-text">Transmissão Ativa</span>
                         </span>
                     </div>
                 </div>
@@ -400,7 +423,7 @@
                         <i data-lucide="message-square" class="w-4 h-4 text-rose-500"></i>
                         <h3 class="font-semibold text-sm text-white">Chat da Sala</h3>
                     </div>
-                    <span class="text-[11px] text-gray-500 bg-cinema-950 px-2 py-0.5 rounded-md border border-cinema-800">Ao vivo</span>
+                    <span id="chat-status-badge" class="text-[11px] text-emerald-400 bg-cinema-950 px-2 py-0.5 rounded-md border border-cinema-800">Conectado</span>
                 </div>
 
                 <!-- Messages Feed -->
@@ -454,10 +477,13 @@
     <!-- ========================================== -->
     <!-- JAVASCRIPT APPLICATION LOGIC               -->
     <!-- ========================================== -->
+    <!-- JAVASCRIPT APPLICATION LOGIC (PEERJS P2P)  -->
+    <!-- ========================================== -->
     <script>
         /**
          * CineSync - Aplicação de Sala de Cinema Sincronizada
-         * Arquitetura em arquivo único com sincronização via BroadcastChannel.
+         * Arquitetura Peer-to-Peer Real com PeerJS (WebRTC DataChannels + MediaStream)
+         * Suporta múltiplos navegadores, dispositivos e abas com fallback inteligente.
          */
         document.addEventListener('DOMContentLoaded', () => {
             // Inicializa ícones Lucide
@@ -465,20 +491,36 @@
 
             // Constante de limite máximo: 5 GB em bytes
             const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024 * 1024; // 5.368.709.120 bytes
+            const PEER_PREFIX = 'cinesync-v2-room-';
+
+            // Configuração de servidores STUN públicos gratuitos para atravessar NAT/Roteadores
+            const PEER_CONFIG = {
+                debug: 1,
+                config: {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' },
+                        { urls: 'stun:stun2.l.google.com:19302' },
+                        { urls: 'stun:global.stun.twilio.com:3478' }
+                    ]
+                }
+            };
 
             // Estado da Aplicação (In-Memory)
             const state = {
                 roomCode: null,
                 role: null, // 'host' | 'guest'
                 username: 'Espectador',
-                peerId: 'peer_' + Math.random().toString(36).substring(2, 9),
-                channel: null,
-                connectedPeers: new Set(),
+                peer: null,
+                hostConnection: null, // DataConnection usada pelo Guest para falar com o Host
+                guestConnections: new Map(), // Map<peerId, { conn, call, username }> usado pelo Host
+                participants: new Map(), // Map<peerId, { username, role }>
                 currentVideoUrl: null,
                 currentFileName: null,
                 currentFileSize: 0,
-                isSyncingFromHost: false, // Previne loops infinitos de eventos
-                heartbeatInterval: null
+                guestUsingLocalFile: false, // Se o convidado optou por carregar arquivo local
+                activeMediaCall: null,
+                syncInterval: null
             };
 
             // Referências DOM - Lobby
@@ -493,14 +535,23 @@
             const displayRoomCode = document.getElementById('display-room-code');
             const btnCopyCode = document.getElementById('btn-copy-code');
             const roleBadge = document.getElementById('role-badge');
+            const networkStatusPill = document.getElementById('network-status-pill');
+            const networkStatusDot = document.getElementById('network-status-dot');
+            const networkStatusText = document.getElementById('network-status-text');
             const viewerCountEl = document.getElementById('viewer-count');
-            const btnSimulateGuest = document.getElementById('btn-simulate-guest');
+            const viewersPill = document.getElementById('viewers-pill');
+            const btnForceSync = document.getElementById('btn-force-sync');
+            const btnReconnect = document.getElementById('btn-reconnect');
             const btnLeaveRoom = document.getElementById('btn-leave-room');
 
             // Referências DOM - Upload & Player
             const hostUploadPanel = document.getElementById('host-upload-panel');
             const guestStatusBanner = document.getElementById('guest-status-banner');
+            const guestBannerIcon = document.getElementById('guest-banner-icon');
+            const guestBannerText = document.getElementById('guest-banner-text');
             const guestFileBadge = document.getElementById('guest-file-badge');
+            const guestLocalFileInput = document.getElementById('guest-local-file-input');
+            const guestLocalLabel = document.getElementById('guest-local-label');
             const videoFileInput = document.getElementById('video-file-input');
             const uploadBtnLabel = document.getElementById('upload-btn-label');
             const fileInfoText = document.getElementById('file-info-text');
@@ -511,6 +562,8 @@
             const placeholderSubtitle = document.getElementById('placeholder-subtitle');
             const videoEl = document.getElementById('cinema-video');
             const videoSyncPill = document.getElementById('video-sync-pill');
+            const videoSyncDot = document.getElementById('video-sync-dot');
+            const videoSyncText = document.getElementById('video-sync-text');
             const customControls = document.getElementById('custom-controls');
 
             // Controles do Player
@@ -532,23 +585,18 @@
             const activeMediaFooter = document.getElementById('active-media-footer');
             const activeFileName = document.getElementById('active-file-name');
             const activeFileSize = document.getElementById('active-file-size');
+            const syncModeText = document.getElementById('sync-mode-text');
 
-            // Referências DOM - Chat & Modal
+            // Referências DOM - Chat
             const chatMessages = document.getElementById('chat-messages');
+            const chatStatusBadge = document.getElementById('chat-status-badge');
             const chatForm = document.getElementById('chat-form');
             const chatInput = document.getElementById('chat-input');
-            const guestHelpModal = document.getElementById('guest-help-modal');
-            const btnCloseModal = document.getElementById('btn-close-modal');
-            const modalRoomCode = document.getElementById('modal-room-code');
-            const btnModalCopy = document.getElementById('btn-modal-copy');
 
             // ==========================================
             // FUNÇÕES UTILITÁRIAS
             // ==========================================
 
-            /**
-             * Exibe notificações toast elegantes (substituindo alert() nativo)
-             */
             function showToast(title, message, type = 'info') {
                 const container = document.getElementById('toast-container');
                 const toast = document.createElement('div');
@@ -579,21 +627,16 @@
                 container.appendChild(toast);
                 lucide.createIcons({ root: toast });
 
-                // Animação de entrada
                 requestAnimationFrame(() => {
                     toast.classList.remove('translate-x-full', 'opacity-0');
                 });
 
-                // Remoção automática
                 setTimeout(() => {
                     toast.classList.add('translate-x-full', 'opacity-0');
                     setTimeout(() => toast.remove(), 300);
                 }, 4500);
             }
 
-            /**
-             * Gera um código aleatório de 6 caracteres alfanuméricos
-             */
             function generateRoomCode() {
                 const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
                 let code = '';
@@ -603,37 +646,25 @@
                 return code;
             }
 
-            /**
-             * Formata bytes para MB ou GB legíveis
-             */
             function formatBytes(bytes) {
                 if (!bytes || bytes === 0) return '0 MB';
                 const gb = bytes / (1024 * 1024 * 1024);
-                if (gb >= 1) {
-                    return gb.toFixed(2) + ' GB';
-                }
+                if (gb >= 1) return gb.toFixed(2) + ' GB';
                 const mb = bytes / (1024 * 1024);
                 return mb.toFixed(1) + ' MB';
             }
 
-            /**
-             * Formata segundos para MM:SS ou HH:MM:SS
-             */
             function formatTime(seconds) {
                 if (isNaN(seconds) || !isFinite(seconds)) return '00:00';
                 const hrs = Math.floor(seconds / 3600);
                 const mins = Math.floor((seconds % 3600) / 60);
                 const secs = Math.floor(seconds % 60);
-
                 if (hrs > 0) {
                     return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
                 }
                 return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
             }
 
-            /**
-             * Copia texto para a área de transferência compatível com iframes
-             */
             function copyTextToClipboard(text) {
                 const tempInput = document.createElement('input');
                 tempInput.value = text;
@@ -641,27 +672,143 @@
                 tempInput.select();
                 try {
                     document.execCommand('copy');
-                    showToast('Código Copiado!', `O código ${text} foi copiado para sua área de transferência.`, 'success');
+                    showToast('Código Copiado!', `O código ${text} foi copiado. Envie para seus amigos!`, 'success');
                 } catch (err) {
-                    showToast('Erro ao copiar', 'Não foi possível copiar automaticamente. Selecione o código manualmente.', 'error');
+                    showToast('Erro ao copiar', 'Selecione e copie o código manualmente.', 'error');
                 }
                 document.body.removeChild(tempInput);
             }
 
+            function setNetworkStatus(status, text) {
+                networkStatusPill.classList.remove('hidden');
+                networkStatusText.textContent = text;
+                
+                networkStatusDot.className = 'w-2 h-2 rounded-full';
+                if (status === 'online') {
+                    networkStatusDot.classList.add('bg-emerald-500');
+                    chatStatusBadge.textContent = 'Online P2P';
+                    chatStatusBadge.className = 'text-[11px] text-emerald-400 bg-cinema-950 px-2 py-0.5 rounded-md border border-emerald-500/30';
+                } else if (status === 'connecting') {
+                    networkStatusDot.classList.add('bg-amber-400', 'animate-pulse');
+                    chatStatusBadge.textContent = 'Conectando...';
+                    chatStatusBadge.className = 'text-[11px] text-amber-400 bg-cinema-950 px-2 py-0.5 rounded-md border border-amber-500/30';
+                } else {
+                    networkStatusDot.classList.add('bg-rose-500');
+                    chatStatusBadge.textContent = 'Desconectado';
+                    chatStatusBadge.className = 'text-[11px] text-rose-400 bg-cinema-950 px-2 py-0.5 rounded-md border border-rose-500/30';
+                }
+            }
+
+            function updateGuestBanner(status, message) {
+                guestBannerText.innerHTML = message;
+                if (status === 'connected') {
+                    guestBannerIcon.setAttribute('data-lucide', 'check-circle-2');
+                    guestBannerIcon.className = 'w-4 h-4 text-emerald-400 shrink-0';
+                } else if (status === 'streaming') {
+                    guestBannerIcon.setAttribute('data-lucide', 'radio');
+                    guestBannerIcon.className = 'w-4 h-4 text-emerald-400 animate-pulse shrink-0';
+                } else if (status === 'error') {
+                    guestBannerIcon.setAttribute('data-lucide', 'wifi-off');
+                    guestBannerIcon.className = 'w-4 h-4 text-rose-400 shrink-0';
+                } else {
+                    guestBannerIcon.setAttribute('data-lucide', 'loader-2');
+                    guestBannerIcon.className = 'w-4 h-4 text-amber-400 animate-spin shrink-0';
+                }
+                lucide.createIcons({ root: guestStatusBanner });
+            }
+
+            function updateVideoSyncOverlay(status, text) {
+                videoSyncText.textContent = text;
+                videoSyncDot.className = 'w-2 h-2 rounded-full';
+                if (status === 'synced') {
+                    videoSyncDot.classList.add('bg-emerald-400', 'animate-ping');
+                    videoSyncPill.className = 'absolute top-4 right-4 bg-black/75 backdrop-blur-md border border-emerald-500/30 px-3 py-1.5 rounded-full flex items-center gap-2 text-xs font-medium text-emerald-400 z-20 pointer-events-none';
+                } else if (status === 'waiting') {
+                    videoSyncDot.classList.add('bg-amber-400', 'animate-pulse');
+                    videoSyncPill.className = 'absolute top-4 right-4 bg-black/75 backdrop-blur-md border border-amber-500/30 px-3 py-1.5 rounded-full flex items-center gap-2 text-xs font-medium text-amber-300 z-20 pointer-events-none';
+                } else {
+                    videoSyncDot.classList.add('bg-rose-500');
+                    videoSyncPill.className = 'absolute top-4 right-4 bg-black/75 backdrop-blur-md border border-rose-500/30 px-3 py-1.5 rounded-full flex items-center gap-2 text-xs font-medium text-rose-400 z-20 pointer-events-none';
+                }
+            }
+
             // ==========================================
-            // GERENCIAMENTO DE SALA & SINCRONIZAÇÃO
+            // CAPTURA DE STREAM WEBRTC DO VÍDEO DO HOST
             // ==========================================
 
             /**
-             * Entra na sala como Host ou Guest
+             * Obtém o MediaStream do elemento <video> do Host com compatibilidade cross-browser
              */
+            function getHostVideoStream() {
+                if (!videoEl || !videoEl.src) return null;
+                try {
+                    if (typeof videoEl.captureStream === 'function') {
+                        return videoEl.captureStream();
+                    } else if (typeof videoEl.mozCaptureStream === 'function') {
+                        return videoEl.mozCaptureStream();
+                    }
+                } catch (err) {
+                    console.warn('Falha ao capturar stream do vídeo:', err);
+                }
+                return null;
+            }
+
+            /**
+             * Inicia chamada de mídia WebRTC do Host para um Convidado específico
+             */
+            function streamVideoToGuest(guestPeerId) {
+                if (state.role !== 'host' || !state.peer || !state.currentVideoUrl) return;
+                
+                const stream = getHostVideoStream();
+                if (!stream) {
+                    showToast('Aviso de Transmissão', 'Seu navegador restringiu a captura direta de stream. Os convidados ainda podem usar o modo arquivo local.', 'warning');
+                    return;
+                }
+
+                const guestEntry = state.guestConnections.get(guestPeerId);
+                if (guestEntry && guestEntry.call) {
+                    try { guestEntry.call.close(); } catch (e) {}
+                }
+
+                const call = state.peer.call(guestPeerId, stream, {
+                    metadata: {
+                        fileName: state.currentFileName,
+                        fileSize: state.currentFileSize
+                    }
+                });
+
+                if (guestEntry) {
+                    guestEntry.call = call;
+                }
+            }
+
+            /**
+             * Transmite o vídeo ativo para TODOS os convidados conectados na sala
+             */
+            function streamVideoToAllGuests() {
+                if (state.role !== 'host' || !state.currentVideoUrl) return;
+                state.guestConnections.forEach((_, guestPeerId) => {
+                    streamVideoToGuest(guestPeerId);
+                });
+            }
+
+            // ==========================================
+            // GERENCIAMENTO DE SALA & PEERJS (HOST / GUEST)
+            // ==========================================
+
             function enterRoom(code, role) {
+                if (typeof Peer === 'undefined') {
+                    showToast('Erro de Rede', 'A biblioteca PeerJS não pôde ser carregada. Verifique sua conexão com a internet.', 'error');
+                    return;
+                }
+
                 const rawName = usernameInput.value.trim();
                 state.username = rawName || (role === 'host' ? 'Anfitrião' : 'Convidado_' + Math.floor(Math.random() * 900 + 100));
                 state.roomCode = code.toUpperCase();
                 state.role = role;
-                state.connectedPeers.clear();
-                state.connectedPeers.add(state.peerId);
+                state.guestConnections.clear();
+                state.participants.clear();
+                state.guestUsingLocalFile = false;
 
                 // Alterna telas
                 lobbyView.classList.add('hidden');
@@ -669,10 +816,8 @@
 
                 // Atualiza UI do Header
                 displayRoomCode.textContent = state.roomCode;
-                modalRoomCode.textContent = state.roomCode;
-                updateViewerCount();
+                setNetworkStatus('connecting', 'Conectando à rede P2P...');
 
-                // Configura permissões visuais e funcionais por Papel (Host vs Guest)
                 if (role === 'host') {
                     roleBadge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/15 border border-rose-500/30 text-rose-400';
                     roleBadge.innerHTML = `<i data-lucide="crown" class="w-3.5 h-3.5"></i> Host (Anfitrião)`;
@@ -680,7 +825,9 @@
                     hostUploadPanel.classList.remove('hidden');
                     guestStatusBanner.classList.add('hidden');
                     videoSyncPill.classList.add('hidden');
-                    btnSimulateGuest.classList.remove('hidden');
+                    btnForceSync.classList.remove('hidden');
+                    btnForceSync.classList.add('inline-flex');
+                    btnReconnect.classList.add('hidden');
 
                     // Habilita controles de reprodução do Host
                     btnPlayPause.disabled = false;
@@ -690,7 +837,9 @@
                     lockedControlsHint.classList.add('hidden');
 
                     placeholderTitle.textContent = 'Sua sala está pronta!';
-                    placeholderSubtitle.textContent = 'Selecione um arquivo de vídeo acima (até 5 GB) para iniciar a exibição.';
+                    placeholderSubtitle.textContent = 'Selecione ou arraste um vídeo acima (até 5 GB) para transmitir aos convidados.';
+                    
+                    initHostPeer();
                 } else {
                     roleBadge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/15 border border-indigo-500/30 text-indigo-300';
                     roleBadge.innerHTML = `<i data-lucide="eye" class="w-3.5 h-3.5"></i> Convidado`;
@@ -698,7 +847,8 @@
                     hostUploadPanel.classList.add('hidden');
                     guestStatusBanner.classList.remove('hidden');
                     videoSyncPill.classList.remove('hidden');
-                    btnSimulateGuest.classList.add('hidden');
+                    btnForceSync.classList.add('hidden');
+                    btnReconnect.classList.add('hidden');
 
                     // Bloqueia controles de reprodução para o Convidado
                     btnPlayPause.disabled = true;
@@ -708,34 +858,454 @@
                     lockedControlsHint.classList.remove('hidden');
                     lockedControlsHint.classList.add('inline-flex');
 
-                    placeholderTitle.textContent = 'Aguardando o Host iniciar o vídeo...';
-                    placeholderSubtitle.textContent = 'Assim que o anfitrião carregar um arquivo, o player será sincronizado automaticamente.';
+                    updateGuestBanner('connecting', `Conectando ao Host da sala <strong>${state.roomCode}</strong>...`);
+                    updateVideoSyncOverlay('waiting', 'Conectando ao Host...');
+                    placeholderTitle.textContent = 'Conectando à sala do Host...';
+                    placeholderSubtitle.textContent = 'Aguarde alguns segundos enquanto estabelecemos a conexão direta P2P.';
+
+                    initGuestPeer();
                 }
 
                 lucide.createIcons();
-                initBroadcastChannel();
-                addSystemMessage(`Você entrou na sala ${state.roomCode} como ${role === 'host' ? 'Host (Anfitrião)' : 'Convidado'}.`);
             }
 
             /**
-             * Sai da sala e limpa recursos
+             * Inicializa o nó PeerJS do HOST com ID determinístico baseado no código da sala
+             */
+            function initHostPeer() {
+                if (state.peer) {
+                    try { state.peer.destroy(); } catch (e) {}
+                }
+
+                const hostPeerId = PEER_PREFIX + state.roomCode;
+                state.peer = new Peer(hostPeerId, PEER_CONFIG);
+
+                state.peer.on('open', (id) => {
+                    state.participants.set(id, { username: state.username, role: 'host' });
+                    updateParticipantsUI();
+                    setNetworkStatus('online', 'Online • Pronto para convidados');
+                    addSystemMessage(`Sala ${state.roomCode} criada! Compartilhe o código com seus amigos.`);
+                });
+
+                // Recebe conexões de dados (Chat + Controle) de Convidados
+                state.peer.on('connection', (conn) => {
+                    conn.on('open', () => {
+                        state.guestConnections.set(conn.peer, { conn, call: null, username: 'Convidado' });
+                    });
+
+                    conn.on('data', (data) => {
+                        handleHostReceiveData(conn, data);
+                    });
+
+                    conn.on('close', () => {
+                        const info = state.guestConnections.get(conn.peer);
+                        const leftName = info ? info.username : 'Um convidado';
+                        state.guestConnections.delete(conn.peer);
+                        state.participants.delete(conn.peer);
+                        updateParticipantsUI();
+                        
+                        const leaveMsg = { type: 'SYSTEM_MSG', text: `${leftName} saiu da sala.` };
+                        addSystemMessage(leaveMsg.text);
+                        broadcastToGuests(leaveMsg);
+                        broadcastParticipantsList();
+                    });
+
+                    conn.on('error', (err) => {
+                        console.warn('Erro na conexão com convidado:', err);
+                    });
+                });
+
+                state.peer.on('error', (err) => {
+                    console.error('PeerJS Host Error:', err);
+                    if (err.type === 'unavailable-id') {
+                        // Caso raro de colisão de código: gera um novo automaticamente
+                        const newCode = generateRoomCode();
+                        state.roomCode = newCode;
+                        displayRoomCode.textContent = newCode;
+                        initHostPeer();
+                    } else {
+                        setNetworkStatus('offline', 'Erro na rede P2P');
+                        showToast('Erro de Conexão', 'Não foi possível manter o canal P2P. Verifique sua internet.', 'error');
+                    }
+                });
+
+                // Heartbeat periódico (a cada 3s) para manter o relógio dos convidados perfeitamente alinhado
+                if (state.syncInterval) clearInterval(state.syncInterval);
+                state.syncInterval = setInterval(() => {
+                    if (state.role === 'host' && state.currentVideoUrl && state.guestConnections.size > 0) {
+                        broadcastToGuests({
+                            type: 'SYNC_HEARTBEAT',
+                            currentTime: videoEl.currentTime,
+                            paused: videoEl.paused
+                        });
+                    }
+                }, 3000);
+            }
+
+            /**
+             * Processa mensagens recebidas pelo HOST e retransmite para o grupo
+             */
+            function handleHostReceiveData(conn, data) {
+                if (!data || !data.type) return;
+
+                switch (data.type) {
+                    case 'JOIN':
+                        const guestName = data.username || 'Convidado';
+                        state.guestConnections.set(conn.peer, { conn, call: null, username: guestName });
+                        state.participants.set(conn.peer, { username: guestName, role: 'guest' });
+                        updateParticipantsUI();
+
+                        const joinText = `${guestName} entrou na sala.`;
+                        addSystemMessage(joinText);
+                        
+                        // Avisa todos os outros convidados e atualiza lista de participantes
+                        broadcastToGuests({ type: 'SYSTEM_MSG', text: joinText }, conn.peer);
+                        broadcastParticipantsList();
+
+                        // Envia confirmação de boas-vindas + metadados do vídeo ativo (se houver)
+                        conn.send({
+                            type: 'WELCOME',
+                            hostName: state.username,
+                            hasVideo: Boolean(state.currentVideoUrl),
+                            fileName: state.currentFileName,
+                            fileSize: state.currentFileSize,
+                            currentTime: videoEl.currentTime || 0,
+                            paused: videoEl.paused
+                        });
+
+                        // Se já existe um vídeo carregado pelo Host, inicia o stream WebRTC imediatamente para esse convidado!
+                        if (state.currentVideoUrl) {
+                            setTimeout(() => streamVideoToGuest(conn.peer), 400);
+                        }
+                        break;
+
+                    case 'REQUEST_STREAM':
+                        if (state.currentVideoUrl) {
+                            streamVideoToGuest(conn.peer);
+                        }
+                        break;
+
+                    case 'CHAT_MESSAGE':
+                        // Exibe no chat do Host e retransmite para TODOS os convidados
+                        appendChatMessage(data.username, 'guest', data.text, false);
+                        broadcastToGuests({
+                            type: 'CHAT_MESSAGE',
+                            senderId: conn.peer,
+                            username: data.username,
+                            role: 'guest',
+                            text: data.text
+                        }, conn.peer);
+                        break;
+                }
+            }
+
+            /**
+             * Envia dados do Host para todos os convidados conectados (opcionalmente ignorando um peerId)
+             */
+            function broadcastToGuests(payload, excludePeerId = null) {
+                state.guestConnections.forEach((entry, peerId) => {
+                    if (peerId !== excludePeerId && entry.conn && entry.conn.open) {
+                        try {
+                            entry.conn.send(payload);
+                        } catch (e) {
+                            console.warn('Falha ao enviar para convidado:', peerId, e);
+                        }
+                    }
+                });
+            }
+
+            function broadcastParticipantsList() {
+                const list = Array.from(state.participants.entries()).map(([id, info]) => ({
+                    id,
+                    username: info.username,
+                    role: info.role
+                }));
+                broadcastToGuests({ type: 'PARTICIPANTS_UPDATE', list });
+            }
+
+            /**
+             * Inicializa o nó PeerJS do CONVIDADO e conecta ao Host da sala
+             */
+            function initGuestPeer() {
+                if (state.peer) {
+                    try { state.peer.destroy(); } catch (e) {}
+                }
+
+                btnReconnect.classList.add('hidden');
+                setNetworkStatus('connecting', 'Conectando ao Host...');
+                updateGuestBanner('connecting', `Conectando ao Host da sala <strong>${state.roomCode}</strong>...`);
+
+                state.peer = new Peer(PEER_CONFIG);
+
+                state.peer.on('open', (myId) => {
+                    const targetHostId = PEER_PREFIX + state.roomCode;
+                    const conn = state.peer.connect(targetHostId, { reliable: true });
+                    state.hostConnection = conn;
+
+                    // Timeout de segurança caso o código da sala não exista
+                    const connectionTimeout = setTimeout(() => {
+                        if (!conn.open) {
+                            setNetworkStatus('offline', 'Sala não encontrada');
+                            updateGuestBanner('error', `Não foi possível encontrar o Host da sala <strong>${state.roomCode}</strong>. Verifique o código.`);
+                            updateVideoSyncOverlay('error', 'Host offline ou código inválido');
+                            placeholderTitle.textContent = 'Host não encontrado';
+                            placeholderSubtitle.textContent = 'Verifique se o código da sala está correto e se o Host está com a sala aberta.';
+                            btnReconnect.classList.remove('hidden');
+                            btnReconnect.classList.add('inline-flex');
+                        }
+                    }, 9000);
+
+                    conn.on('open', () => {
+                        clearTimeout(connectionTimeout);
+                        setNetworkStatus('online', 'Conectado ao Host');
+                        btnReconnect.classList.add('hidden');
+
+                        // Envia pacote JOIN para entrar na sala e no chat
+                        conn.send({
+                            type: 'JOIN',
+                            username: state.username
+                        });
+                    });
+
+                    conn.on('data', (data) => {
+                        handleGuestReceiveData(data);
+                    });
+
+                    conn.on('close', () => {
+                        setNetworkStatus('offline', 'Desconectado do Host');
+                        updateGuestBanner('error', 'A conexão com o Host foi encerrada.');
+                        updateVideoSyncOverlay('error', 'Desconectado do Host');
+                        addSystemMessage('Você foi desconectado do Host.');
+                        btnReconnect.classList.remove('hidden');
+                        btnReconnect.classList.add('inline-flex');
+                    });
+
+                    conn.on('error', (err) => {
+                        console.error('Erro na conexão com Host:', err);
+                        setNetworkStatus('offline', 'Erro de conexão');
+                        btnReconnect.classList.remove('hidden');
+                        btnReconnect.classList.add('inline-flex');
+                    });
+                });
+
+                // Recebe o Stream de Vídeo/Áudio WebRTC enviado pelo Host!
+                state.peer.on('call', (call) => {
+                    state.activeMediaCall = call;
+                    call.answer(); // Responde sem enviar câmera/mic (somente recebe o cinema)
+
+                    call.on('stream', (remoteStream) => {
+                        // Se o convidado não estiver usando um arquivo local manual, exibe o stream do Host
+                        if (!state.guestUsingLocalFile) {
+                            attachRemoteStreamToPlayer(remoteStream, call.metadata);
+                        }
+                    });
+
+                    call.on('close', () => {
+                        if (!state.guestUsingLocalFile) {
+                            updateVideoSyncOverlay('waiting', 'Transmissão encerrada pelo Host');
+                        }
+                    });
+                });
+
+                state.peer.on('error', (err) => {
+                    console.error('PeerJS Guest Error:', err);
+                    setNetworkStatus('offline', 'Falha na conexão P2P');
+                    updateGuestBanner('error', 'Erro ao conectar na sala. Verifique o código e tente novamente.');
+                    btnReconnect.classList.remove('hidden');
+                    btnReconnect.classList.add('inline-flex');
+                });
+            }
+
+            /**
+             * Conecta o MediaStream recebido via WebRTC ao player de vídeo do Convidado
+             */
+            function attachRemoteStreamToPlayer(remoteStream, metadata) {
+                videoPlaceholder.classList.add('hidden');
+                videoEl.classList.remove('hidden');
+                customControls.classList.remove('hidden');
+                activeMediaFooter.classList.remove('hidden');
+
+                if (metadata && metadata.fileName) {
+                    activeFileName.textContent = metadata.fileName;
+                    activeFileSize.textContent = formatBytes(metadata.fileSize || 0);
+                    guestFileBadge.textContent = metadata.fileName;
+                    guestFileBadge.classList.remove('hidden');
+                }
+
+                syncModeText.textContent = 'Transmissão ao Vivo do Host';
+                videoEl.srcObject = remoteStream;
+                
+                // Tenta iniciar reprodução automática; se o navegador bloquear áudio sem clique, inicia mutado e avisa
+                videoEl.play().then(() => {
+                    updatePlayPauseUI(false);
+                    updateGuestBanner('streaming', 'Assistindo transmissão ao vivo sincronizada com o <strong>Host</strong>.');
+                    updateVideoSyncOverlay('synced', 'Sincronizado com o Host');
+                }).catch(() => {
+                    videoEl.muted = true;
+                    updateVolumeIcon();
+                    videoEl.play().catch(() => {});
+                    updatePlayPauseUI(false);
+                    updateGuestBanner('streaming', 'Transmissão recebida! Clique no botão de volume para ativar o som.');
+                    updateVideoSyncOverlay('synced', 'Sincronizado (Clique para ativar som)');
+                    showToast('Áudio Mutado pelo Navegador', 'Clique no ícone de som no player para ouvir o vídeo.', 'warning');
+                });
+            }
+
+            /**
+             * Processa comandos de controle, sincronização e chat recebidos pelo CONVIDADO
+             */
+            function handleGuestReceiveData(data) {
+                if (!data || !data.type) return;
+
+                switch (data.type) {
+                    case 'WELCOME':
+                        addSystemMessage(`Conectado à sala de ${data.hostName}!`);
+                        if (data.hasVideo) {
+                            state.currentFileName = data.fileName;
+                            state.currentFileSize = data.fileSize;
+                            guestFileBadge.textContent = data.fileName;
+                            guestFileBadge.classList.remove('hidden');
+                            activeFileName.textContent = data.fileName;
+                            activeFileSize.textContent = formatBytes(data.fileSize);
+
+                            updateGuestBanner('connecting', `Recebendo vídeo <strong>"${data.fileName}"</strong> do Host...`);
+                            updateVideoSyncOverlay('waiting', 'Recebendo transmissão...');
+                            placeholderTitle.textContent = 'Carregando transmissão do Host...';
+                            placeholderSubtitle.textContent = `O Host está exibindo "${data.fileName}". O vídeo iniciará em instantes.`;
+                        } else {
+                            updateGuestBanner('connected', 'Conectado! Aguardando o <strong>Host</strong> selecionar um vídeo.');
+                            updateVideoSyncOverlay('waiting', 'Aguardando vídeo do Host');
+                            placeholderTitle.textContent = 'Conectado à sala!';
+                            placeholderSubtitle.textContent = 'Aguardando o Host carregar um arquivo de vídeo para começar.';
+                        }
+                        break;
+
+                    case 'VIDEO_LOADED':
+                        state.currentFileName = data.fileName;
+                        state.currentFileSize = data.fileSize;
+                        guestFileBadge.textContent = data.fileName;
+                        guestFileBadge.classList.remove('hidden');
+                        activeFileName.textContent = data.fileName;
+                        activeFileSize.textContent = formatBytes(data.fileSize);
+                        
+                        addSystemMessage(`O Host carregou "${data.fileName}" (${formatBytes(data.fileSize)}).`);
+                        if (!state.guestUsingLocalFile) {
+                            updateGuestBanner('connecting', `O Host carregou <strong>"${data.fileName}"</strong>. Iniciando transmissão...`);
+                            updateVideoSyncOverlay('waiting', 'Iniciando transmissão...');
+                        }
+                        break;
+
+                    case 'VIDEO_PLAY':
+                        if (videoEl.src || videoEl.srcObject) {
+                            if (state.guestUsingLocalFile && Math.abs(videoEl.currentTime - data.currentTime) > 0.6) {
+                                videoEl.currentTime = data.currentTime;
+                            }
+                            videoEl.play().catch(() => {});
+                            updatePlayPauseUI(false);
+                            updateVideoSyncOverlay('synced', 'Sincronizado com o Host');
+                        }
+                        break;
+
+                    case 'VIDEO_PAUSE':
+                        if (videoEl.src || videoEl.srcObject) {
+                            videoEl.pause();
+                            if (state.guestUsingLocalFile) {
+                                videoEl.currentTime = data.currentTime;
+                            }
+                            updatePlayPauseUI(true);
+                            updateVideoSyncOverlay('synced', 'Pausado pelo Host');
+                        }
+                        break;
+
+                    case 'VIDEO_SEEK':
+                        if (state.guestUsingLocalFile && videoEl.src) {
+                            videoEl.currentTime = data.currentTime;
+                        }
+                        updateVideoSyncOverlay('synced', 'Sincronizado com o Host');
+                        break;
+
+                    case 'SYNC_HEARTBEAT':
+                        // Atualiza duração e barra visual mesmo no modo stream
+                        if (data.duration && !state.guestUsingLocalFile) {
+                            timeCurrent.textContent = formatTime(data.currentTime);
+                            timeDuration.textContent = formatTime(data.duration);
+                            seekBar.value = (data.currentTime / data.duration) * 100;
+                        }
+                        if (state.guestUsingLocalFile && videoEl.src) {
+                            if (Math.abs(videoEl.currentTime - data.currentTime) > 1.2) {
+                                videoEl.currentTime = data.currentTime;
+                            }
+                            if (data.paused && !videoEl.paused) {
+                                videoEl.pause();
+                                updatePlayPauseUI(true);
+                            } else if (!data.paused && videoEl.paused) {
+                                videoEl.play().catch(() => {});
+                                updatePlayPauseUI(false);
+                            }
+                        }
+                        break;
+
+                    case 'CHAT_MESSAGE':
+                        appendChatMessage(data.username, data.role, data.text, false);
+                        break;
+
+                    case 'SYSTEM_MSG':
+                        addSystemMessage(data.text);
+                        break;
+
+                    case 'PARTICIPANTS_UPDATE':
+                        if (Array.isArray(data.list)) {
+                            viewerCountEl.textContent = Math.max(1, data.list.length);
+                            const names = data.list.map(p => `${p.username}${p.role === 'host' ? ' (Host)' : ''}`).join(', ');
+                            viewersPill.title = `Na sala: ${names}`;
+                        }
+                        break;
+                }
+            }
+
+            function updateParticipantsUI() {
+                const count = Math.max(1, state.participants.size);
+                viewerCountEl.textContent = count;
+                const names = Array.from(state.participants.values())
+                    .map(p => `${p.username}${p.role === 'host' ? ' (Host)' : ''}`)
+                    .join(', ');
+                viewersPill.title = `Na sala: ${names}`;
+            }
+
+            /**
+             * Sai da sala e limpa todas as conexões P2P e streams
              */
             function leaveRoom() {
-                if (state.channel) {
-                    broadcastMessage({ type: 'PEER_LEAVE', peerId: state.peerId, username: state.username });
-                    state.channel.close();
-                    state.channel = null;
+                if (state.syncInterval) {
+                    clearInterval(state.syncInterval);
+                    state.syncInterval = null;
                 }
-                if (state.heartbeatInterval) {
-                    clearInterval(state.heartbeatInterval);
+                if (state.activeMediaCall) {
+                    try { state.activeMediaCall.close(); } catch (e) {}
+                    state.activeMediaCall = null;
+                }
+                if (state.hostConnection) {
+                    try { state.hostConnection.close(); } catch (e) {}
+                    state.hostConnection = null;
+                }
+                state.guestConnections.forEach((entry) => {
+                    try { if (entry.call) entry.call.close(); } catch (e) {}
+                    try { if (entry.conn) entry.conn.close(); } catch (e) {}
+                });
+                state.guestConnections.clear();
+
+                if (state.peer) {
+                    try { state.peer.destroy(); } catch (e) {}
+                    state.peer = null;
                 }
                 if (state.currentVideoUrl) {
                     URL.revokeObjectURL(state.currentVideoUrl);
                     state.currentVideoUrl = null;
                 }
 
-                // Reseta vídeo
+                // Reseta player de vídeo
                 videoEl.pause();
+                videoEl.srcObject = null;
                 videoEl.removeAttribute('src');
                 videoEl.load();
                 videoEl.classList.add('hidden');
@@ -746,135 +1316,18 @@
 
                 state.roomCode = null;
                 state.role = null;
+                state.guestUsingLocalFile = false;
 
                 roomView.classList.add('hidden');
                 lobbyView.classList.remove('hidden');
             }
 
-            /**
-             * Inicializa o canal BroadcastChannel para sincronização entre abas da mesma sala
-             */
-            function initBroadcastChannel() {
-                if (state.channel) {
-                    state.channel.close();
-                }
-
-                const channelName = `cinesync_room_${state.roomCode}`;
-                state.channel = new BroadcastChannel(channelName);
-
-                state.channel.onmessage = (event) => {
-                    const data = event.data;
-                    if (!data || data.peerId === state.peerId) return;
-
-                    switch (data.type) {
-                        case 'PEER_JOIN':
-                            state.connectedPeers.add(data.peerId);
-                            updateViewerCount();
-                            addSystemMessage(`${data.username} entrou na sala.`);
-                            
-                            // Responde anunciando presença
-                            broadcastMessage({ type: 'PEER_ACK', peerId: state.peerId, username: state.username });
-
-                            // Se eu sou o Host e já tenho um vídeo carregado, envio o estado atual para o novo Convidado!
-                            if (state.role === 'host' && state.currentVideoUrl) {
-                                broadcastMessage({
-                                    type: 'SYNC_STATE',
-                                    peerId: state.peerId,
-                                    videoUrl: state.currentVideoUrl,
-                                    fileName: state.currentFileName,
-                                    fileSize: state.currentFileSize,
-                                    currentTime: videoEl.currentTime,
-                                    paused: videoEl.paused
-                                });
-                            }
-                            break;
-
-                        case 'PEER_ACK':
-                            state.connectedPeers.add(data.peerId);
-                            updateViewerCount();
-                            break;
-
-                        case 'PEER_LEAVE':
-                            state.connectedPeers.delete(data.peerId);
-                            updateViewerCount();
-                            addSystemMessage(`${data.username} saiu da sala.`);
-                            break;
-
-                        case 'VIDEO_LOADED':
-                        case 'SYNC_STATE':
-                            if (state.role === 'guest') {
-                                handleGuestReceiveVideo(data);
-                            }
-                            break;
-
-                        case 'VIDEO_PLAY':
-                            if (state.role === 'guest' && videoEl.src) {
-                                state.isSyncingFromHost = true;
-                                if (Math.abs(videoEl.currentTime - data.currentTime) > 0.5) {
-                                    videoEl.currentTime = data.currentTime;
-                                }
-                                videoEl.play().catch(() => {
-                                    showToast('Interação Necessária', 'Clique em qualquer lugar da página para liberar o áudio automático do navegador.', 'warning');
-                                });
-                                updatePlayPauseUI(false);
-                                setTimeout(() => { state.isSyncingFromHost = false; }, 150);
-                            }
-                            break;
-
-                        case 'VIDEO_PAUSE':
-                            if (state.role === 'guest' && videoEl.src) {
-                                state.isSyncingFromHost = true;
-                                videoEl.pause();
-                                videoEl.currentTime = data.currentTime;
-                                updatePlayPauseUI(true);
-                                setTimeout(() => { state.isSyncingFromHost = false; }, 150);
-                            }
-                            break;
-
-                        case 'VIDEO_SEEK':
-                            if (state.role === 'guest' && videoEl.src) {
-                                state.isSyncingFromHost = true;
-                                videoEl.currentTime = data.currentTime;
-                                setTimeout(() => { state.isSyncingFromHost = false; }, 150);
-                            }
-                            break;
-
-                        case 'CHAT_MESSAGE':
-                            appendChatMessage(data.username, data.role, data.text, false);
-                            break;
-                    }
-                };
-
-                // Anuncia chegada na sala
-                broadcastMessage({
-                    type: 'PEER_JOIN',
-                    peerId: state.peerId,
-                    username: state.username,
-                    role: state.role
-                });
-            }
-
-            /**
-             * Envia payload pelo BroadcastChannel
-             */
-            function broadcastMessage(payload) {
-                if (state.channel) {
-                    state.channel.postMessage(payload);
-                }
-            }
-
-            function updateViewerCount() {
-                viewerCountEl.textContent = Math.max(1, state.connectedPeers.size);
-            }
-
             // ==========================================
-            // UPLOAD DE VÍDEO (LIMITE 5 GB) & PLAYER
+            // UPLOAD DE VÍDEO (LIMITE 5 GB + DRAG & DROP)
             // ==========================================
 
-            videoFileInput.addEventListener('change', (e) => {
-                if (state.role !== 'host') return;
-                const file = e.target.files[0];
-                if (!file) return;
+            function handleHostFileSelection(file) {
+                if (state.role !== 'host' || !file) return;
 
                 // Validação estrita de tamanho máximo: 5 GB
                 if (file.size > MAX_FILE_SIZE_BYTES) {
@@ -884,83 +1337,109 @@
                         `O arquivo selecionado possui ${sizeGB} GB. O limite máximo permitido nesta sala é de 5.00 GB.`,
                         'error'
                     );
-                    videoFileInput.value = ''; // Limpa input
+                    videoFileInput.value = '';
                     return;
                 }
 
-                // Libera URL anterior se existir para economizar memória RAM
                 if (state.currentVideoUrl) {
                     URL.revokeObjectURL(state.currentVideoUrl);
                 }
 
-                // Cria ObjectURL instantâneo (não carrega arquivo inteiro na memória JS)
                 const objectUrl = URL.createObjectURL(file);
                 state.currentVideoUrl = objectUrl;
                 state.currentFileName = file.name;
                 state.currentFileSize = file.size;
 
-                loadVideoIntoPlayer(objectUrl, file.name, file.size);
-                uploadBtnLabel.textContent = 'Trocar Vídeo';
-                fileInfoText.innerHTML = `Arquivo ativo: <strong class="text-emerald-400">${file.name}</strong> (${formatBytes(file.size)})`;
-
-                // Notifica os convidados na sala
-                broadcastMessage({
-                    type: 'VIDEO_LOADED',
-                    peerId: state.peerId,
-                    videoUrl: objectUrl,
-                    fileName: file.name,
-                    fileSize: file.size,
-                    currentTime: 0,
-                    paused: true
-                });
-
-                addSystemMessage(`Você carregou "${file.name}" (${formatBytes(file.size)}).`);
-                showToast('Vídeo Carregado!', 'O vídeo está pronto e sincronizado com a sala.', 'success');
-            });
-
-            /**
-             * Carrega o vídeo no elemento HTML5 e exibe os controles
-             */
-            function loadVideoIntoPlayer(url, name, size) {
                 videoPlaceholder.classList.add('hidden');
                 videoEl.classList.remove('hidden');
                 customControls.classList.remove('hidden');
                 activeMediaFooter.classList.remove('hidden');
 
-                activeFileName.textContent = name;
-                activeFileSize.textContent = formatBytes(size);
+                activeFileName.textContent = file.name;
+                activeFileSize.textContent = formatBytes(file.size);
+                syncModeText.textContent = 'Transmitindo para a Sala';
 
-                videoEl.src = url;
+                videoEl.srcObject = null;
+                videoEl.src = objectUrl;
                 videoEl.load();
                 updatePlayPauseUI(true);
+
+                uploadBtnLabel.textContent = 'Trocar Vídeo';
+                fileInfoText.innerHTML = `Arquivo ativo: <strong class="text-emerald-400">${file.name}</strong> (${formatBytes(file.size)})`;
+
+                // Avisa os convidados sobre o novo vídeo e inicia o stream WebRTC
+                broadcastToGuests({
+                    type: 'VIDEO_LOADED',
+                    fileName: file.name,
+                    fileSize: file.size
+                });
+
+                videoEl.onloadeddata = () => {
+                    streamVideoToAllGuests();
+                };
+
+                addSystemMessage(`Você carregou "${file.name}" (${formatBytes(file.size)}).`);
+                showToast('Vídeo Pronto!', 'Dê Play para iniciar a sessão com todos os convidados.', 'success');
             }
 
-            /**
-             * Recebe o vídeo enviado pelo Host na aba do Convidado
-             */
-            function handleGuestReceiveVideo(data) {
-                if (state.currentVideoUrl !== data.videoUrl) {
-                    state.currentVideoUrl = data.videoUrl;
-                    state.currentFileName = data.fileName;
-                    state.currentFileSize = data.fileSize;
+            videoFileInput.addEventListener('change', (e) => {
+                handleHostFileSelection(e.target.files[0]);
+            });
 
-                    loadVideoIntoPlayer(data.videoUrl, data.fileName, data.fileSize);
-                    guestFileBadge.textContent = data.fileName;
-                    guestFileBadge.classList.remove('hidden');
-                    addSystemMessage(`O Host carregou "${data.fileName}" (${formatBytes(data.fileSize)}).`);
+            // Suporte a Drag & Drop no painel de upload do Host
+            hostUploadPanel.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                hostUploadPanel.classList.add('border-rose-500', 'bg-cinema-800/80');
+            });
+
+            hostUploadPanel.addEventListener('dragleave', () => {
+                hostUploadPanel.classList.remove('border-rose-500', 'bg-cinema-800/80');
+            });
+
+            hostUploadPanel.addEventListener('drop', (e) => {
+                e.preventDefault();
+                hostUploadPanel.classList.remove('border-rose-500', 'bg-cinema-800/80');
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    handleHostFileSelection(e.dataTransfer.files[0]);
+                }
+            });
+
+            // Modo Híbrido Opcional: Convidado carrega cópia local do arquivo para qualidade 4K nativa
+            guestLocalFileInput.addEventListener('change', (e) => {
+                if (state.role !== 'guest') return;
+                const file = e.target.files[0];
+                if (!file) return;
+
+                if (file.size > MAX_FILE_SIZE_BYTES) {
+                    showToast('Limite Excedido', 'O arquivo local deve ter no máximo 5 GB.', 'error');
+                    return;
                 }
 
-                videoEl.onloadedmetadata = () => {
-                    videoEl.currentTime = data.currentTime || 0;
-                    if (!data.paused) {
-                        videoEl.play().catch(() => {});
-                        updatePlayPauseUI(false);
-                    } else {
-                        videoEl.pause();
-                        updatePlayPauseUI(true);
-                    }
-                };
-            }
+                if (state.currentVideoUrl) {
+                    URL.revokeObjectURL(state.currentVideoUrl);
+                }
+
+                const localUrl = URL.createObjectURL(file);
+                state.currentVideoUrl = localUrl;
+                state.guestUsingLocalFile = true;
+
+                videoPlaceholder.classList.add('hidden');
+                videoEl.classList.remove('hidden');
+                customControls.classList.remove('hidden');
+                activeMediaFooter.classList.remove('hidden');
+
+                videoEl.srcObject = null;
+                videoEl.src = localUrl;
+                videoEl.load();
+
+                activeFileName.textContent = file.name;
+                activeFileSize.textContent = formatBytes(file.size);
+                syncModeText.textContent = 'Arquivo Local Sincronizado (Qualidade Nativa)';
+                guestLocalLabel.textContent = 'Arquivo local ativo';
+                updateGuestBanner('streaming', `Modo Híbrido: Usando arquivo local <strong>"${file.name}"</strong> sincronizado com o Host.`);
+                updateVideoSyncOverlay('synced', 'Arquivo Local Sincronizado');
+                addSystemMessage(`Você ativou o modo de arquivo local (${file.name}) sincronizado com o Host.`);
+            });
 
             // ==========================================
             // CONTROLES DO PLAYER DE VÍDEO
@@ -982,15 +1461,14 @@
                 if (videoEl.paused) {
                     videoEl.play();
                     updatePlayPauseUI(false);
-                    broadcastMessage({ type: 'VIDEO_PLAY', peerId: state.peerId, currentTime: videoEl.currentTime });
+                    broadcastToGuests({ type: 'VIDEO_PLAY', currentTime: videoEl.currentTime });
                 } else {
                     videoEl.pause();
                     updatePlayPauseUI(true);
-                    broadcastMessage({ type: 'VIDEO_PAUSE', peerId: state.peerId, currentTime: videoEl.currentTime });
+                    broadcastToGuests({ type: 'VIDEO_PAUSE', currentTime: videoEl.currentTime });
                 }
             });
 
-            // Clique direto no vídeo para Play/Pause (Apenas Host)
             videoEl.addEventListener('click', () => {
                 if (state.role === 'host') {
                     btnPlayPause.click();
@@ -1001,14 +1479,14 @@
             btnRewind.addEventListener('click', () => {
                 if (state.role !== 'host' || !videoEl.src) return;
                 videoEl.currentTime = Math.max(0, videoEl.currentTime - 10);
-                broadcastMessage({ type: 'VIDEO_SEEK', peerId: state.peerId, currentTime: videoEl.currentTime });
+                broadcastToGuests({ type: 'VIDEO_SEEK', currentTime: videoEl.currentTime });
             });
 
             // Avançar 10 segundos (Apenas Host)
             btnForward.addEventListener('click', () => {
                 if (state.role !== 'host' || !videoEl.src) return;
                 videoEl.currentTime = Math.min(videoEl.duration || 0, videoEl.currentTime + 10);
-                broadcastMessage({ type: 'VIDEO_SEEK', peerId: state.peerId, currentTime: videoEl.currentTime });
+                broadcastToGuests({ type: 'VIDEO_SEEK', currentTime: videoEl.currentTime });
             });
 
             // Barra de Progresso (Seekbar - Apenas Host)
@@ -1022,26 +1500,28 @@
                 if (state.role !== 'host' || !videoEl.src) return;
                 const seekTo = (seekBar.value / 100) * (videoEl.duration || 0);
                 videoEl.currentTime = seekTo;
-                broadcastMessage({ type: 'VIDEO_SEEK', peerId: state.peerId, currentTime: seekTo });
+                broadcastToGuests({ type: 'VIDEO_SEEK', currentTime: seekTo });
             });
 
             // Atualização contínua do tempo do vídeo
             videoEl.addEventListener('timeupdate', () => {
-                if (!videoEl.duration) return;
+                if (!videoEl.duration || !isFinite(videoEl.duration)) return;
                 const progress = (videoEl.currentTime / videoEl.duration) * 100;
                 seekBar.value = progress;
                 timeCurrent.textContent = formatTime(videoEl.currentTime);
             });
 
             videoEl.addEventListener('loadedmetadata', () => {
-                timeDuration.textContent = formatTime(videoEl.duration);
-                seekBar.value = 0;
+                if (isFinite(videoEl.duration)) {
+                    timeDuration.textContent = formatTime(videoEl.duration);
+                    seekBar.value = 0;
+                }
             });
 
             videoEl.addEventListener('ended', () => {
                 updatePlayPauseUI(true);
                 if (state.role === 'host') {
-                    broadcastMessage({ type: 'VIDEO_PAUSE', peerId: state.peerId, currentTime: videoEl.duration });
+                    broadcastToGuests({ type: 'VIDEO_PAUSE', currentTime: videoEl.duration });
                 }
             });
 
@@ -1083,13 +1563,13 @@
             });
 
             // ==========================================
-            // CHAT SINCRONIZADO DA SALA
+            // CHAT SINCRONIZADO P2P EM GRUPO
             // ==========================================
 
             function addSystemMessage(text) {
                 const div = document.createElement('div');
                 div.className = 'text-center my-2';
-                div.innerHTML = `<span class="inline-block bg-cinema-950 border border-cinema-800 text-gray-400 text-[11px] px-3 py-1 rounded-full">${text}</span>`;
+                div.innerHTML = `<span class="inline-block bg-cinema-950 border border-cinema-800 text-gray-400 text-[11px] px-3 py-1 rounded-full">${escapeHtml(text)}</span>`;
                 chatMessages.appendChild(div);
                 chatMessages.scrollTop = chatMessages.scrollHeight;
             }
@@ -1134,20 +1614,33 @@
                 const text = chatInput.value.trim();
                 if (!text || !state.roomCode) return;
 
-                appendChatMessage(state.username, state.role, text, true);
-                broadcastMessage({
-                    type: 'CHAT_MESSAGE',
-                    peerId: state.peerId,
-                    username: state.username,
-                    role: state.role,
-                    text: text
-                });
-
-                chatInput.value = '';
+                if (state.role === 'host') {
+                    appendChatMessage(state.username, 'host', text, true);
+                    broadcastToGuests({
+                        type: 'CHAT_MESSAGE',
+                        username: state.username,
+                        role: 'host',
+                        text: text
+                    });
+                    chatInput.value = '';
+                } else {
+                    if (state.hostConnection && state.hostConnection.open) {
+                        appendChatMessage(state.username, 'guest', text, true);
+                        state.hostConnection.send({
+                            type: 'CHAT_MESSAGE',
+                            username: state.username,
+                            role: 'guest',
+                            text: text
+                        });
+                        chatInput.value = '';
+                    } else {
+                        showToast('Chat Desconectado', 'Aguarde a conexão com o Host ser restabelecida para enviar mensagens.', 'warning');
+                    }
+                }
             });
 
             // ==========================================
-            // EVENT LISTENERS DE NAVEGAÇÃO (LOBBY / MODAL)
+            // EVENT LISTENERS DE NAVEGAÇÃO E SINCRONIA
             // ==========================================
 
             btnCreateRoom.addEventListener('click', () => {
@@ -1165,7 +1658,6 @@
                 enterRoom(code, 'guest');
             });
 
-            // Permite pressionar Enter no input de código da sala
             roomCodeInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
                     btnJoinRoom.click();
@@ -1176,28 +1668,33 @@
                 if (state.roomCode) copyTextToClipboard(state.roomCode);
             });
 
+            btnForceSync.addEventListener('click', () => {
+                if (state.role !== 'host') return;
+                if (!state.currentVideoUrl) {
+                    showToast('Nenhum Vídeo', 'Carregue um vídeo primeiro antes de sincronizar.', 'warning');
+                    return;
+                }
+                streamVideoToAllGuests();
+                broadcastToGuests({
+                    type: videoEl.paused ? 'VIDEO_PAUSE' : 'VIDEO_PLAY',
+                    currentTime: videoEl.currentTime
+                });
+                showToast('Sincronização Enviada', 'Transmissão e tempo atual reenviados para todos os convidados.', 'success');
+            });
+
+            btnReconnect.addEventListener('click', () => {
+                if (state.role === 'guest' && state.roomCode) {
+                    initGuestPeer();
+                }
+            });
+
             btnLeaveRoom.addEventListener('click', () => {
                 leaveRoom();
             });
 
-            // Modal de Ajuda para Testar Convidado
-            btnSimulateGuest.addEventListener('click', () => {
-                guestHelpModal.classList.remove('hidden');
-            });
-
-            btnCloseModal.addEventListener('click', () => {
-                guestHelpModal.classList.add('hidden');
-            });
-
-            btnModalCopy.addEventListener('click', () => {
-                if (state.roomCode) copyTextToClipboard(state.roomCode);
-                guestHelpModal.classList.add('hidden');
-            });
-
-            // Limpeza ao fechar a aba
             window.addEventListener('beforeunload', () => {
-                if (state.channel && state.roomCode) {
-                    broadcastMessage({ type: 'PEER_LEAVE', peerId: state.peerId, username: state.username });
+                if (state.peer) {
+                    try { state.peer.destroy(); } catch (e) {}
                 }
             });
         });
