@@ -14,287 +14,65 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- PeerJS for Real P2P Data & WebRTC Media Streaming -->
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <!-- YouTube IFrame Player API -->
+    <script src="https://www.youtube.com/iframe_api"></script>
     <script>
         tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                    colors: {
-                        cinema: {
-                            950: '#070709',
-                            900: '#0d0e12',
-                            800: '#161821',
-                            700: '#222533',
-                            accent: '#e11d48', // Rose 600
-                            accentHover: '#be123c',
-                            indigo: '#4f46e5'
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        body {
-            background-color: #070709;
-            color: #f3f4f6;
-            font-family: 'Inter', sans-serif;
-            overflow-x: hidden;
-        }
-
-        /* Custom Scrollbar for Chat */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #0d0e12;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #222533;
-            border-radius: 9999px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #374151;
-        }
-
-        /* Custom Range Input (Seekbar & Volume) */
-        input[type=range] {
-            -webkit-appearance: none;
-            background: transparent;
-        }
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            height: 14px;
-            width: 14px;
-            border-radius: 50%;
-            background: #e11d48;
-            cursor: pointer;
-            margin-top: -5px;
-            box-shadow: 0 0 10px rgba(225, 29, 72, 0.7);
-            transition: transform 0.15s ease;
-        }
-        input[type=range]::-webkit-slider-thumb:hover {
-            transform: scale(1.25);
-        }
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%;
-            height: 4px;
-            cursor: pointer;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 9999px;
-        }
-        input[type=range]:disabled::-webkit-slider-thumb {
-            background: #6b7280;
-            box-shadow: none;
-            cursor: not-allowed;
-        }
-
-        /* Ambient Cinema Glow */
-        .cinema-glow {
-            box-shadow: 0 0 60px -15px rgba(225, 29, 72, 0.18), 0 0 100px -30px rgba(79, 70, 229, 0.15);
-        }
-
-        /* Hide native video controls completely to use our custom synchronized controls */
-        video::-webkit-media-controls {
-            display: none !important;
-        }
-    </style>
-</head>
-<body class="min-h-screen flex flex-col selection:bg-rose-600 selection:text-white">
-
-    <!-- Custom Notification / Alert Banner (Replaces native alert()) -->
-    <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none"></div>
-
-    <!-- ========================================== -->
-    <!-- VIEW 1: LOBBY (TELA INICIAL)               -->
-    <!-- ========================================== -->
-    <main id="lobby-view" class="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 relative overflow-hidden">
-        <!-- Decorative Background Elements -->
-        <div class="absolute top-[-10%] left-[-10%] w-96 h-96 bg-rose-600/10 rounded-full blur-3xl pointer-events-none"></div>
-        <div class="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none"></div>
-
-        <div class="max-w-4xl w-full z-10">
-            <!-- Brand Header -->
-            <div class="text-center mb-10 sm:mb-12">
-                <div class="inline-flex items-center justify-center gap-3 px-4 py-1.5 rounded-full bg-cinema-800/80 border border-cinema-700/80 text-rose-400 text-xs font-semibold tracking-wider uppercase mb-5 shadow-lg">
-                    <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
-                    Watch Party em Tempo Real • Até 5 GB
-                </div>
-                <div class="flex items-center justify-center gap-3 mb-3">
-                    <div class="p-3 bg-gradient-to-br from-rose-600 to-indigo-600 rounded-2xl shadow-lg shadow-rose-600/20">
-                        <i data-lucide="film" class="w-8 h-8 text-white"></i>
-                    </div>
-                    <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-100 to-gray-400">
-                        CineSync
-                    </h1>
-                </div>
-                <p class="text-gray-400 text-base sm:text-lg max-w-xl mx-auto">
-                    Assista filmes e vídeos locais em perfeita sincronia com amigos. O anfitrião controla o play, pause e a linha do tempo para toda a sala.
-                </p>
-            </div>
-
-            <!-- User Name Input -->
-            <div class="max-w-md mx-auto mb-8">
-                <label for="username-input" class="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">
-                    Seu Apelido na Sala
-                </label>
-                <div class="relative">
-                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-500">
-                        <i data-lucide="user" class="w-4 h-4"></i>
-                    </div>
-                    <input type="text" id="username-input" placeholder="Ex: Cinéfilo_SP" maxlength="20"
-                        class="w-full bg-cinema-900 border border-cinema-700 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder-gray-500 outline-none transition">
-                </div>
-            </div>
-
-            <!-- Action Cards Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Card 1: Criar Sala (Host) -->
-                <div class="bg-cinema-900/90 backdrop-blur-md border border-cinema-700/80 hover:border-rose-500/50 rounded-2xl p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 shadow-xl group">
-                    <div>
-                        <div class="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 mb-5 group-hover:scale-110 transition-transform">
-                            <i data-lucide="crown" class="w-6 h-6"></i>
-                        </div>
-                        <h2 class="text-xl font-bold text-white mb-2">Criar Nova Sala</h2>
-                        <p class="text-gray-400 text-sm leading-relaxed mb-6">
-                            Torne-se o <span class="text-gray-200 font-medium">Host (Anfitrião)</span>. Faça upload de um vídeo de até 5 GB do seu dispositivo e controle a reprodução para todos.
-                        </p>
-                    </div>
-                    <button id="btn-create-room" class="w-full py-3.5 px-5 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-semibold rounded-xl shadow-lg shadow-rose-600/25 flex items-center justify-center gap-2 transition active:scale-[0.98]">
-                        <i data-lucide="plus-circle" class="w-5 h-5"></i>
-                        Criar Sala de Cinema
-                    </button>
-                </div>
-
-                <!-- Card 2: Entrar em uma Sala (Guest) -->
-                <div class="bg-cinema-900/90 backdrop-blur-md border border-cinema-700/80 hover:border-indigo-500/50 rounded-2xl p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 shadow-xl group">
-                    <div>
-                        <div class="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-5 group-hover:scale-110 transition-transform">
-                            <i data-lucide="ticket" class="w-6 h-6"></i>
-                        </div>
-                        <h2 class="text-xl font-bold text-white mb-2">Entrar em uma Sala</h2>
-                        <p class="text-gray-400 text-sm leading-relaxed mb-4">
-                            Recebeu um código de 6 caracteres? Digite abaixo para entrar como <span class="text-gray-200 font-medium">Convidado</span> e assistir sincronizado.
-                        </p>
-                        <div class="mb-5">
-                            <input type="text" id="room-code-input" placeholder="CÓDIGO (EX: A8F92K)" maxlength="6"
-                                class="w-full bg-cinema-950 border border-cinema-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl py-3 px-4 text-center text-lg font-mono font-bold tracking-[0.25em] uppercase text-white placeholder-gray-600 outline-none transition">
-                        </div>
-                    </div>
-                    <button id="btn-join-room" class="w-full py-3.5 px-5 bg-cinema-800 hover:bg-indigo-600 border border-cinema-700 hover:border-indigo-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition active:scale-[0.98]">
-                        <i data-lucide="log-in" class="w-5 h-5"></i>
-                        Entrar na Sala
-                    </button>
-                </div>
-            </div>
-
-            <!-- Info Banner about Real P2P Cross-Device Sync -->
-            <div class="mt-8 p-4 rounded-xl bg-cinema-900/60 border border-cinema-800 flex items-start sm:items-center gap-3.5 text-xs sm:text-sm text-gray-400">
-                <i data-lucide="globe" class="w-5 h-5 text-emerald-400 shrink-0 mt-0.5 sm:mt-0"></i>
-                <p>
-                    <strong class="text-gray-200">Conexão Direta P2P (WebRTC):</strong> Agora você pode assistir com amigos em <span class="text-emerald-400 font-medium">qualquer navegador, celular ou computador</span>! O vídeo e o chat são transmitidos diretamente do Host para todos os convidados da sala.
-                </p>
-            </div>
-        </div>
-    </main>
-
-    <!-- ========================================== -->
-    <!-- VIEW 2: CINEMA ROOM (SALA DE CINEMA)       -->
-    <!-- ========================================== -->
-    <div id="room-view" class="hidden flex-1 flex flex-col h-screen max-h-screen overflow-hidden">
-        
-        <!-- Top Navigation Header -->
-        <header class="bg-cinema-900/95 border-b border-cinema-800 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3 shrink-0 z-20">
-            <!-- Left: Logo & Room Code -->
-            <div class="flex items-center gap-3 sm:gap-4">
-                <div class="flex items-center gap-2">
-                    <div class="p-1.5 bg-rose-600 rounded-lg">
-                        <i data-lucide="film" class="w-4 h-4 text-white"></i>
-                    </div>
-                    <span class="font-bold text-lg tracking-tight hidden sm:inline">CineSync</span>
-                </div>
-
-                <div class="h-5 w-px bg-cinema-700"></div>
-
-                <!-- Room Code Pill -->
-                <div class="flex items-center gap-2 bg-cinema-950 border border-cinema-700 rounded-xl px-3 py-1.5">
-                    <span class="text-xs text-gray-400 hidden md:inline">Sala:</span>
-                    <span id="display-room-code" class="font-mono font-bold text-sm sm:text-base tracking-widest text-rose-400">------</span>
-                    <button id="btn-copy-code" title="Copiar código da sala" class="p-1 hover:bg-cinema-800 rounded-lg text-gray-400 hover:text-white transition">
-                        <i data-lucide="copy" class="w-4 h-4"></i>
-                    </button>
-                </div>
-
-                <!-- Role Badge -->
-                <div id="role-badge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold">
-                    <!-- Populated dynamically -->
-                </div>
-
-                <!-- Network / P2P Connection Status Pill -->
-                <div id="network-status-pill" class="hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-cinema-800 border border-cinema-700 text-gray-300">
-                    <span id="network-status-dot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-                    <span id="network-status-text">Conectando P2P...</span>
-                </div>
-            </div>
-
-            <!-- Right: Viewers Count, Force Sync / Reconnect & Leave -->
-            <div class="flex items-center gap-2 sm:gap-3">
-                <!-- Online Viewers Counter -->
-                <div id="viewers-pill" class="flex items-center gap-2 bg-cinema-800/80 border border-cinema-700/80 px-3 py-1.5 rounded-xl text-xs font-medium text-gray-300 cursor-default" title="Espectadores conectados na sala">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <i data-lucide="users" class="w-3.5 h-3.5 text-gray-400"></i>
-                    <span id="viewer-count">1</span>
-                    <span class="hidden sm:inline">online</span>
-                </div>
-
-                <!-- Host: Force Sync Button -->
-                <button id="btn-force-sync" title="Reenviar estado atual e transmissão para todos os convidados" class="hidden items-center gap-1.5 px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs font-medium rounded-xl transition">
-                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-                    <span class="hidden sm:inline">Forçar Sincronização</span>
-                </button>
-
-                <!-- Guest: Reconnect Button (Shown on disconnect/error) -->
-                <button id="btn-reconnect" title="Tentar reconectar ao Host" class="hidden items-center gap-1.5 px-3 py-1.5 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 text-amber-300 text-xs font-medium rounded-xl transition">
-                    <i data-lucide="wifi" class="w-3.5 h-3.5"></i>
-                    <span>Reconectar</span>
-                </button>
-
-                <!-- Leave Room Button -->
-                <button id="btn-leave-room" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-cinema-800 hover:bg-rose-600/20 border border-cinema-700 hover:border-rose-500/50 text-gray-300 hover:text-rose-400 text-xs font-semibold rounded-xl transition">
-                    <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
-                    <span>Sair</span>
-                </button>
-            </div>
-        </header>
-
-        <!-- Main Workspace: Video Stage + Side Chat -->
-        <div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
-            
+// ... existing code ... -->
             <!-- Left / Center: Video Theater Stage -->
             <section class="flex-1 flex flex-col bg-cinema-950 p-3 sm:p-5 overflow-y-auto">
                 
-                <!-- Host Upload Bar (Supports Drag & Drop + Button, Visible ONLY to Host) -->
-                <div id="host-upload-panel" class="hidden mb-4 bg-cinema-900 border-2 border-dashed border-cinema-700 hover:border-rose-500/60 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-colors">
-                    <div class="flex items-center gap-3">
-                        <div class="p-2.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-500 shrink-0">
-                            <i data-lucide="upload-cloud" class="w-5 h-5"></i>
-                        </div>
-                        <div>
-                            <h3 class="text-sm font-semibold text-white">Carregar Vídeo na Sala (ou arraste aqui)</h3>
-                            <p id="file-info-text" class="text-xs text-gray-400">Formatos: MP4, WebM, MKV, MOV • Limite máximo: <strong class="text-gray-200">5 GB</strong></p>
+                <!-- Host Media Selection & YouTube Search Panel (Visible ONLY to Host) -->
+                <div id="host-upload-panel" class="hidden mb-4 bg-cinema-900 border border-cinema-700/90 rounded-2xl p-3.5 sm:p-4 flex flex-col gap-3.5 transition-colors shadow-lg">
+                    <div class="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
+                        <!-- YouTube Search Bar with Magnifying Glass -->
+                        <form id="yt-search-form" class="flex-1 flex items-center gap-2">
+                            <div class="relative flex-1">
+                                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-rose-500">
+                                    <i data-lucide="youtube" class="w-4 h-4"></i>
+                                </div>
+                                <input type="text" id="yt-search-input" placeholder="Pesquisar vídeos no YouTube ou colar link..." autocomplete="off"
+                                    class="w-full bg-cinema-950 border border-cinema-700 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 rounded-xl py-2.5 pl-10 pr-9 text-xs sm:text-sm text-white placeholder-gray-500 outline-none transition">
+                                <button type="button" id="btn-clear-yt-search" title="Limpar busca" class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-300">
+                                    <i data-lucide="x" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                            <button type="submit" id="btn-yt-search" title="Pesquisar no YouTube" class="px-4 py-2.5 bg-cinema-800 hover:bg-rose-600 border border-cinema-700 hover:border-rose-500 text-white text-xs sm:text-sm font-semibold rounded-xl flex items-center justify-center gap-2 transition shrink-0 active:scale-[0.98]">
+                                <i data-lucide="search" class="w-4 h-4"></i>
+                                <span class="hidden sm:inline">Pesquisar</span>
+                            </button>
+                        </form>
+
+                        <div class="hidden xl:block h-7 w-px bg-cinema-800"></div>
+
+                        <!-- Local File Upload Button (Up to 5 GB) -->
+                        <div class="flex items-center justify-between sm:justify-end gap-3">
+                            <div class="text-left sm:text-right">
+                                <p id="file-info-text" class="text-[11px] sm:text-xs text-gray-400">Vídeo local (MP4, WebM, MKV) • Máx: <strong class="text-gray-200">5 GB</strong></p>
+                            </div>
+                            <input type="file" id="video-file-input" accept="video/*,.mkv,.mp4,.webm,.mov,.avi" class="hidden">
+                            <label for="video-file-input" class="cursor-pointer inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-lg shadow-rose-600/20 transition shrink-0 active:scale-[0.98]">
+                                <i data-lucide="folder-open" class="w-4 h-4"></i>
+                                <span id="upload-btn-label">Importar Vídeo</span>
+                            </label>
                         </div>
                     </div>
 
-                    <div class="flex items-center gap-2 w-full sm:w-auto">
-                        <input type="file" id="video-file-input" accept="video/*,.mkv,.mp4,.webm,.mov,.avi" class="hidden">
-                        <label for="video-file-input" class="w-full sm:w-auto cursor-pointer inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-lg shadow-rose-600/20 transition active:scale-[0.98]">
-                            <i data-lucide="folder-open" class="w-4 h-4"></i>
-                            <span id="upload-btn-label">Selecionar Arquivo</span>
-                        </label>
+                    <!-- YouTube Search Results Menu / Grid -->
+                    <div id="yt-results-drawer" class="hidden border-t border-cinema-800 pt-3.5">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                                <h4 id="yt-results-title" class="text-xs font-bold uppercase tracking-wider text-gray-300">Resultados do YouTube</h4>
+                            </div>
+                            <button type="button" id="btn-close-yt-results" class="text-xs text-gray-400 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-cinema-800 transition">
+                                <i data-lucide="chevron-up" class="w-3.5 h-3.5"></i>
+                                <span>Ocultar menu</span>
+                            </button>
+                        </div>
+                        <div id="yt-results-grid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 max-h-72 overflow-y-auto pr-1">
+                            <!-- Populated dynamically with YouTube search results -->
+                        </div>
                     </div>
                 </div>
 
@@ -308,11 +86,13 @@
                         <span id="guest-file-badge" class="hidden text-xs font-mono bg-indigo-900/60 border border-indigo-500/30 px-2.5 py-1 rounded-lg text-indigo-300 truncate max-w-[180px]"></span>
                         
                         <!-- Optional Hybrid Mode: Guest can load local copy for native 4K quality -->
-                        <input type="file" id="guest-local-file-input" accept="video/*,.mkv,.mp4,.webm,.mov,.avi" class="hidden">
-                        <label for="guest-local-file-input" title="Opcional: Carregue o mesmo arquivo do seu PC para assistir em 4K nativo sincronizado pelos comandos do Host" class="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-1 bg-cinema-800 hover:bg-cinema-700 border border-cinema-600 text-gray-300 hover:text-white text-xs font-medium rounded-lg transition">
-                            <i data-lucide="hard-drive" class="w-3.5 h-3.5 text-indigo-400"></i>
-                            <span id="guest-local-label">Usar arquivo local</span>
-                        </label>
+                        <div id="guest-local-upload-wrapper" class="flex items-center">
+                            <input type="file" id="guest-local-file-input" accept="video/*,.mkv,.mp4,.webm,.mov,.avi" class="hidden">
+                            <label for="guest-local-file-input" title="Opcional: Carregue o mesmo arquivo do seu PC para assistir em 4K nativo sincronizado pelos comandos do Host" class="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-1 bg-cinema-800 hover:bg-cinema-700 border border-cinema-600 text-gray-300 hover:text-white text-xs font-medium rounded-lg transition">
+                                <i data-lucide="hard-drive" class="w-3.5 h-3.5 text-indigo-400"></i>
+                                <span id="guest-local-label">Usar arquivo local</span>
+                            </label>
+                        </div>
                     </div>
                 </div>
 
@@ -326,12 +106,19 @@
                         </div>
                         <h4 id="placeholder-title" class="text-base sm:text-lg font-bold text-gray-200 mb-1">Nenhum vídeo carregado</h4>
                         <p id="placeholder-subtitle" class="text-xs sm:text-sm text-gray-500">
-                            Selecione um arquivo de vídeo acima (até 5 GB) para iniciar a sessão de cinema.
+                            Pesquise um vídeo no YouTube ou importe um arquivo local (até 5 GB) acima para iniciar.
                         </p>
                     </div>
 
-                    <!-- HTML5 Video Element -->
+                    <!-- HTML5 Video Element (For Local Video / WebRTC Stream) -->
                     <video id="cinema-video" class="hidden w-full h-full max-h-[68vh] object-contain bg-black" playsinline></video>
+
+                    <!-- YouTube IFrame Player Container (For Synchronized YouTube Playback) -->
+                    <div id="youtube-stage" class="hidden relative w-full h-full min-h-[260px] sm:min-h-[420px] max-h-[68vh] bg-black flex items-center justify-center">
+                        <div id="yt-player-mount" class="w-full h-full"></div>
+                        <!-- Transparent interaction shield so clicks/drags pass through our synchronized controls -->
+                        <div id="yt-click-shield" class="absolute inset-0 z-10 cursor-pointer"></div>
+                    </div>
 
                     <!-- Guest Sync Badge Overlay (Top Right inside Video) -->
                     <div id="video-sync-pill" class="hidden absolute top-4 right-4 bg-black/75 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-full flex items-center gap-2 text-xs font-medium text-emerald-400 z-20 pointer-events-none">
@@ -480,10 +267,16 @@
     <!-- JAVASCRIPT APPLICATION LOGIC (PEERJS P2P)  -->
     <!-- ========================================== -->
     <script>
+        // Callback global exigida pela YouTube IFrame Player API
+        window.ytApiReady = false;
+        window.onYouTubeIframeAPIReady = function () {
+            window.ytApiReady = true;
+        };
+
         /**
          * CineSync - Aplicação de Sala de Cinema Sincronizada
          * Arquitetura Peer-to-Peer Real com PeerJS (WebRTC DataChannels + MediaStream)
-         * Suporta múltiplos navegadores, dispositivos e abas com fallback inteligente.
+         * + Busca Integrada do YouTube (Piped / Invidious APIs) e Player YouTube Sincronizado.
          */
         document.addEventListener('DOMContentLoaded', () => {
             // Inicializa ícones Lucide
@@ -492,6 +285,20 @@
             // Constante de limite máximo: 5 GB em bytes
             const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024 * 1024; // 5.368.709.120 bytes
             const PEER_PREFIX = 'cinesync-v2-room-';
+
+            // Instâncias públicas para busca no YouTube compatíveis com navegador (CORS habilitado)
+            const PIPED_INSTANCES = [
+                'https://pipedapi.kavin.rocks',
+                'https://pipedapi.adminforge.de',
+                'https://api.piped.private.coffee',
+                'https://pipedapi.leptons.xyz'
+            ];
+
+            const INVIDIOUS_INSTANCES = [
+                'https://inv.nadeko.net',
+                'https://invidious.nerdvpn.de',
+                'https://invidious.privacyredirect.com'
+            ];
 
             // Configuração de servidores STUN públicos gratuitos para atravessar NAT/Roteadores
             const PEER_CONFIG = {
@@ -515,41 +322,37 @@
                 hostConnection: null, // DataConnection usada pelo Guest para falar com o Host
                 guestConnections: new Map(), // Map<peerId, { conn, call, username }> usado pelo Host
                 participants: new Map(), // Map<peerId, { username, role }>
+                mediaMode: 'none', // 'none' | 'local' | 'youtube'
                 currentVideoUrl: null,
                 currentFileName: null,
                 currentFileSize: 0,
+                youtubeVideoId: null,
+                youtubeTitle: null,
+                ytPlayer: null,
+                ytProgressTimer: null,
                 guestUsingLocalFile: false, // Se o convidado optou por carregar arquivo local
                 activeMediaCall: null,
                 syncInterval: null
             };
 
             // Referências DOM - Lobby
-            const lobbyView = document.getElementById('lobby-view');
-            const roomView = document.getElementById('room-view');
-            const usernameInput = document.getElementById('username-input');
-            const roomCodeInput = document.getElementById('room-code-input');
-            const btnCreateRoom = document.getElementById('btn-create-room');
-            const btnJoinRoom = document.getElementById('btn-join-room');
-
-            // Referências DOM - Header da Sala
-            const displayRoomCode = document.getElementById('display-room-code');
-            const btnCopyCode = document.getElementById('btn-copy-code');
-            const roleBadge = document.getElementById('role-badge');
-            const networkStatusPill = document.getElementById('network-status-pill');
-            const networkStatusDot = document.getElementById('network-status-dot');
-            const networkStatusText = document.getElementById('network-status-text');
-            const viewerCountEl = document.getElementById('viewer-count');
-            const viewersPill = document.getElementById('viewers-pill');
-            const btnForceSync = document.getElementById('btn-force-sync');
-            const btnReconnect = document.getElementById('btn-reconnect');
-            const btnLeaveRoom = document.getElementById('btn-leave-room');
-
+// ... existing code ... -->
             // Referências DOM - Upload & Player
             const hostUploadPanel = document.getElementById('host-upload-panel');
+            const ytSearchForm = document.getElementById('yt-search-form');
+            const ytSearchInput = document.getElementById('yt-search-input');
+            const btnClearYtSearch = document.getElementById('btn-clear-yt-search');
+            const btnYtSearch = document.getElementById('btn-yt-search');
+            const ytResultsDrawer = document.getElementById('yt-results-drawer');
+            const ytResultsTitle = document.getElementById('yt-results-title');
+            const ytResultsGrid = document.getElementById('yt-results-grid');
+            const btnCloseYtResults = document.getElementById('btn-close-yt-results');
+
             const guestStatusBanner = document.getElementById('guest-status-banner');
             const guestBannerIcon = document.getElementById('guest-banner-icon');
             const guestBannerText = document.getElementById('guest-banner-text');
             const guestFileBadge = document.getElementById('guest-file-badge');
+            const guestLocalUploadWrapper = document.getElementById('guest-local-upload-wrapper');
             const guestLocalFileInput = document.getElementById('guest-local-file-input');
             const guestLocalLabel = document.getElementById('guest-local-label');
             const videoFileInput = document.getElementById('video-file-input');
@@ -561,203 +364,20 @@
             const placeholderTitle = document.getElementById('placeholder-title');
             const placeholderSubtitle = document.getElementById('placeholder-subtitle');
             const videoEl = document.getElementById('cinema-video');
+            const youtubeStage = document.getElementById('youtube-stage');
+            const ytClickShield = document.getElementById('yt-click-shield');
             const videoSyncPill = document.getElementById('video-sync-pill');
             const videoSyncDot = document.getElementById('video-sync-dot');
             const videoSyncText = document.getElementById('video-sync-text');
             const customControls = document.getElementById('custom-controls');
 
             // Controles do Player
-            const seekBar = document.getElementById('seek-bar');
-            const timeCurrent = document.getElementById('time-current');
-            const timeDuration = document.getElementById('time-duration');
-            const btnPlayPause = document.getElementById('btn-play-pause');
-            const iconPlay = document.getElementById('icon-play');
-            const iconPause = document.getElementById('icon-pause');
-            const btnRewind = document.getElementById('btn-rewind');
-            const btnForward = document.getElementById('btn-forward');
-            const lockedControlsHint = document.getElementById('locked-controls-hint');
-            const btnMute = document.getElementById('btn-mute');
-            const iconVolHigh = document.getElementById('icon-vol-high');
-            const iconVolMute = document.getElementById('icon-vol-mute');
-            const volumeBar = document.getElementById('volume-bar');
-            const btnFullscreen = document.getElementById('btn-fullscreen');
-
-            const activeMediaFooter = document.getElementById('active-media-footer');
-            const activeFileName = document.getElementById('active-file-name');
-            const activeFileSize = document.getElementById('active-file-size');
-            const syncModeText = document.getElementById('sync-mode-text');
-
-            // Referências DOM - Chat
-            const chatMessages = document.getElementById('chat-messages');
-            const chatStatusBadge = document.getElementById('chat-status-badge');
-            const chatForm = document.getElementById('chat-form');
-            const chatInput = document.getElementById('chat-input');
-
-            // ==========================================
-            // FUNÇÕES UTILITÁRIAS
-            // ==========================================
-
-            function showToast(title, message, type = 'info') {
-                const container = document.getElementById('toast-container');
-                const toast = document.createElement('div');
-                
-                const colors = {
-                    info: 'bg-cinema-900 border-indigo-500/50 text-indigo-300',
-                    success: 'bg-cinema-900 border-emerald-500/50 text-emerald-300',
-                    error: 'bg-cinema-900 border-rose-500 text-rose-300',
-                    warning: 'bg-cinema-900 border-amber-500/50 text-amber-300'
-                };
-
-                const icons = {
-                    info: 'info',
-                    success: 'check-circle',
-                    error: 'alert-octagon',
-                    warning: 'alert-triangle'
-                };
-
-                toast.className = `pointer-events-auto border ${colors[type] || colors.info} p-4 rounded-xl shadow-2xl backdrop-blur-md flex items-start gap-3 transform transition-all duration-300 translate-x-full opacity-0`;
-                toast.innerHTML = `
-                    <i data-lucide="${icons[type] || 'info'}" class="w-5 h-5 shrink-0 mt-0.5"></i>
-                    <div class="flex-1">
-                        <h4 class="text-xs font-bold uppercase tracking-wider text-white">${title}</h4>
-                        <p class="text-xs text-gray-300 mt-1 leading-relaxed">${message}</p>
-                    </div>
-                `;
-
-                container.appendChild(toast);
-                lucide.createIcons({ root: toast });
-
-                requestAnimationFrame(() => {
-                    toast.classList.remove('translate-x-full', 'opacity-0');
-                });
-
-                setTimeout(() => {
-                    toast.classList.add('translate-x-full', 'opacity-0');
-                    setTimeout(() => toast.remove(), 300);
-                }, 4500);
-            }
-
-            function generateRoomCode() {
-                const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-                let code = '';
-                for (let i = 0; i < 6; i++) {
-                    code += chars.charAt(Math.floor(Math.random() * chars.length));
-                }
-                return code;
-            }
-
-            function formatBytes(bytes) {
-                if (!bytes || bytes === 0) return '0 MB';
-                const gb = bytes / (1024 * 1024 * 1024);
-                if (gb >= 1) return gb.toFixed(2) + ' GB';
-                const mb = bytes / (1024 * 1024);
-                return mb.toFixed(1) + ' MB';
-            }
-
-            function formatTime(seconds) {
-                if (isNaN(seconds) || !isFinite(seconds)) return '00:00';
-                const hrs = Math.floor(seconds / 3600);
-                const mins = Math.floor((seconds % 3600) / 60);
-                const secs = Math.floor(seconds % 60);
-                if (hrs > 0) {
-                    return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-                }
-                return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-            }
-
-            function copyTextToClipboard(text) {
-                const tempInput = document.createElement('input');
-                tempInput.value = text;
-                document.body.appendChild(tempInput);
-                tempInput.select();
-                try {
-                    document.execCommand('copy');
-                    showToast('Código Copiado!', `O código ${text} foi copiado. Envie para seus amigos!`, 'success');
-                } catch (err) {
-                    showToast('Erro ao copiar', 'Selecione e copie o código manualmente.', 'error');
-                }
-                document.body.removeChild(tempInput);
-            }
-
-            function setNetworkStatus(status, text) {
-                networkStatusPill.classList.remove('hidden');
-                networkStatusText.textContent = text;
-                
-                networkStatusDot.className = 'w-2 h-2 rounded-full';
-                if (status === 'online') {
-                    networkStatusDot.classList.add('bg-emerald-500');
-                    chatStatusBadge.textContent = 'Online P2P';
-                    chatStatusBadge.className = 'text-[11px] text-emerald-400 bg-cinema-950 px-2 py-0.5 rounded-md border border-emerald-500/30';
-                } else if (status === 'connecting') {
-                    networkStatusDot.classList.add('bg-amber-400', 'animate-pulse');
-                    chatStatusBadge.textContent = 'Conectando...';
-                    chatStatusBadge.className = 'text-[11px] text-amber-400 bg-cinema-950 px-2 py-0.5 rounded-md border border-amber-500/30';
-                } else {
-                    networkStatusDot.classList.add('bg-rose-500');
-                    chatStatusBadge.textContent = 'Desconectado';
-                    chatStatusBadge.className = 'text-[11px] text-rose-400 bg-cinema-950 px-2 py-0.5 rounded-md border border-rose-500/30';
-                }
-            }
-
-            function updateGuestBanner(status, message) {
-                guestBannerText.innerHTML = message;
-                if (status === 'connected') {
-                    guestBannerIcon.setAttribute('data-lucide', 'check-circle-2');
-                    guestBannerIcon.className = 'w-4 h-4 text-emerald-400 shrink-0';
-                } else if (status === 'streaming') {
-                    guestBannerIcon.setAttribute('data-lucide', 'radio');
-                    guestBannerIcon.className = 'w-4 h-4 text-emerald-400 animate-pulse shrink-0';
-                } else if (status === 'error') {
-                    guestBannerIcon.setAttribute('data-lucide', 'wifi-off');
-                    guestBannerIcon.className = 'w-4 h-4 text-rose-400 shrink-0';
-                } else {
-                    guestBannerIcon.setAttribute('data-lucide', 'loader-2');
-                    guestBannerIcon.className = 'w-4 h-4 text-amber-400 animate-spin shrink-0';
-                }
-                lucide.createIcons({ root: guestStatusBanner });
-            }
-
-            function updateVideoSyncOverlay(status, text) {
-                videoSyncText.textContent = text;
-                videoSyncDot.className = 'w-2 h-2 rounded-full';
-                if (status === 'synced') {
-                    videoSyncDot.classList.add('bg-emerald-400', 'animate-ping');
-                    videoSyncPill.className = 'absolute top-4 right-4 bg-black/75 backdrop-blur-md border border-emerald-500/30 px-3 py-1.5 rounded-full flex items-center gap-2 text-xs font-medium text-emerald-400 z-20 pointer-events-none';
-                } else if (status === 'waiting') {
-                    videoSyncDot.classList.add('bg-amber-400', 'animate-pulse');
-                    videoSyncPill.className = 'absolute top-4 right-4 bg-black/75 backdrop-blur-md border border-amber-500/30 px-3 py-1.5 rounded-full flex items-center gap-2 text-xs font-medium text-amber-300 z-20 pointer-events-none';
-                } else {
-                    videoSyncDot.classList.add('bg-rose-500');
-                    videoSyncPill.className = 'absolute top-4 right-4 bg-black/75 backdrop-blur-md border border-rose-500/30 px-3 py-1.5 rounded-full flex items-center gap-2 text-xs font-medium text-rose-400 z-20 pointer-events-none';
-                }
-            }
-
-            // ==========================================
-            // CAPTURA DE STREAM WEBRTC DO VÍDEO DO HOST
-            // ==========================================
-
-            /**
-             * Obtém o MediaStream do elemento <video> do Host com compatibilidade cross-browser
-             */
-            function getHostVideoStream() {
-                if (!videoEl || !videoEl.src) return null;
-                try {
-                    if (typeof videoEl.captureStream === 'function') {
-                        return videoEl.captureStream();
-                    } else if (typeof videoEl.mozCaptureStream === 'function') {
-                        return videoEl.mozCaptureStream();
-                    }
-                } catch (err) {
-                    console.warn('Falha ao capturar stream do vídeo:', err);
-                }
-                return null;
-            }
-
+// ... existing code ... -->
             /**
              * Inicia chamada de mídia WebRTC do Host para um Convidado específico
              */
             function streamVideoToGuest(guestPeerId) {
-                if (state.role !== 'host' || !state.peer || !state.currentVideoUrl) return;
+                if (state.role !== 'host' || !state.peer || state.mediaMode !== 'local' || !state.currentVideoUrl) return;
                 
                 const stream = getHostVideoStream();
                 if (!stream) {
@@ -786,10 +406,363 @@
              * Transmite o vídeo ativo para TODOS os convidados conectados na sala
              */
             function streamVideoToAllGuests() {
-                if (state.role !== 'host' || !state.currentVideoUrl) return;
+                if (state.role !== 'host' || state.mediaMode !== 'local' || !state.currentVideoUrl) return;
                 state.guestConnections.forEach((_, guestPeerId) => {
                     streamVideoToGuest(guestPeerId);
                 });
+            }
+
+            // ==========================================
+            // PESQUISA YOUTUBE & PLAYER SINCRONIZADO
+            // ==========================================
+
+            /**
+             * Extrai o ID de 11 caracteres de links do YouTube (watch, youtu.be, shorts, embed) ou ID direto
+             */
+            function extractYouTubeId(input) {
+                if (!input) return null;
+                const trimmed = input.trim();
+                if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
+                    return trimmed;
+                }
+                const patterns = [
+                    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/|youtube\.com\/live\/)([a-zA-Z0-9_-]{11})/,
+                    /[?&]v=([a-zA-Z0-9_-]{11})/
+                ];
+                for (const regex of patterns) {
+                    const match = trimmed.match(regex);
+                    if (match && match[1]) return match[1];
+                }
+                return null;
+            }
+
+            function formatViews(views) {
+                if (!views || isNaN(views)) return '';
+                if (views >= 1000000) return (views / 1000000).toFixed(1).replace('.0', '') + ' mi de visualizações';
+                if (views >= 1000) return Math.floor(views / 1000) + ' mil visualizações';
+                return views + ' visualizações';
+            }
+
+            /**
+             * Busca vídeos no YouTube usando APIs públicas (Piped com fallback para Invidious)
+             */
+            async function searchYouTubeVideos(query) {
+                const directId = extractYouTubeId(query);
+                ytResultsDrawer.classList.remove('hidden');
+                ytResultsTitle.textContent = `Buscando "${query}" no YouTube...`;
+                ytResultsGrid.innerHTML = `
+                    <div class="col-span-full py-8 flex flex-col items-center justify-center text-gray-400 gap-2">
+                        <i data-lucide="loader-2" class="w-6 h-6 text-rose-500 animate-spin"></i>
+                        <span class="text-xs">Pesquisando vídeos relacionados...</span>
+                    </div>
+                `;
+                lucide.createIcons({ root: ytResultsGrid });
+
+                // Se o usuário colou um link direto ou ID do YouTube, exibe o card imediato além de tentar buscar detalhes
+                if (directId) {
+                    renderYouTubeResults([{
+                        videoId: directId,
+                        title: `Vídeo do YouTube (${directId})`,
+                        channel: 'Link Direto do YouTube',
+                        duration: null,
+                        views: null,
+                        thumbnail: `https://i.ytimg.com/vi/${directId}/hqdefault.jpg`
+                    }], `Vídeo encontrado pelo link`);
+                    return;
+                }
+
+                // 1. Tenta instâncias Piped API
+                for (const baseUrl of PIPED_INSTANCES) {
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 5500);
+                        const res = await fetch(`${baseUrl}/search?q=${encodeURIComponent(query)}&filter=videos`, {
+                            signal: controller.signal
+                        });
+                        clearTimeout(timeoutId);
+
+                        if (!res.ok) continue;
+                        const data = await res.json();
+                        const items = (data.items || [])
+                            .filter(item => item.type === 'stream' && item.url)
+                            .map(item => {
+                                const vid = extractYouTubeId(item.url);
+                                return {
+                                    videoId: vid,
+                                    title: item.title || 'Sem título',
+                                    channel: item.uploaderName || 'Canal do YouTube',
+                                    duration: item.duration > 0 ? formatTime(item.duration) : 'AO VIVO',
+                                    views: item.views,
+                                    thumbnail: item.thumbnail || (vid ? `https://i.ytimg.com/vi/${vid}/hqdefault.jpg` : '')
+                                };
+                            })
+                            .filter(v => v.videoId);
+
+                        if (items.length > 0) {
+                            renderYouTubeResults(items.slice(0, 12), `Resultados para "${query}"`);
+                            return;
+                        }
+                    } catch (err) {
+                        // Continua para a próxima instância
+                    }
+                }
+
+                // 2. Fallback para instâncias Invidious API
+                for (const baseUrl of INVIDIOUS_INSTANCES) {
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 5500);
+                        const res = await fetch(`${baseUrl}/api/v1/search?q=${encodeURIComponent(query)}&type=video`, {
+                            signal: controller.signal
+                        });
+                        clearTimeout(timeoutId);
+
+                        if (!res.ok) continue;
+                        const data = await res.json();
+                        const items = (Array.isArray(data) ? data : [])
+                            .filter(item => item.videoId)
+                            .map(item => ({
+                                videoId: item.videoId,
+                                title: item.title || 'Sem título',
+                                channel: item.author || 'Canal do YouTube',
+                                duration: item.lengthSeconds > 0 ? formatTime(item.lengthSeconds) : 'AO VIVO',
+                                views: item.viewCount,
+                                thumbnail: `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`
+                            }));
+
+                        if (items.length > 0) {
+                            renderYouTubeResults(items.slice(0, 12), `Resultados para "${query}"`);
+                            return;
+                        }
+                    } catch (err) {
+                        // Continua para a próxima instância
+                    }
+                }
+
+                // Caso todas as APIs públicas estejam temporariamente bloqueadas pela rede
+                ytResultsTitle.textContent = 'Busca indisponível no momento';
+                ytResultsGrid.innerHTML = `
+                    <div class="col-span-full p-4 bg-cinema-950 border border-cinema-800 rounded-xl text-center">
+                        <p class="text-xs text-gray-300 mb-1">Não foi possível consultar os servidores de busca agora.</p>
+                        <p class="text-[11px] text-gray-500">Dica: Você pode colar qualquer <strong>link do YouTube</strong> (ex: <span class="text-gray-400 font-mono">https://youtu.be/...</span>) diretamente na barra acima!</p>
+                    </div>
+                `;
+            }
+
+            /**
+             * Renderiza o menu/grade de resultados do YouTube
+             */
+            function renderYouTubeResults(videos, headingText) {
+                ytResultsTitle.textContent = headingText;
+                ytResultsGrid.innerHTML = '';
+
+                videos.forEach(video => {
+                    const card = document.createElement('button');
+                    card.type = 'button';
+                    card.className = 'group text-left bg-cinema-950 hover:bg-cinema-800/90 border border-cinema-800 hover:border-rose-500/60 rounded-xl p-2 flex gap-3 transition-all active:scale-[0.99]';
+                    
+                    const durationBadge = video.duration
+                        ? `<span class="absolute bottom-1 right-1 bg-black/85 text-white text-[10px] font-mono px-1.5 py-0.5 rounded">${escapeHtml(video.duration)}</span>`
+                        : '';
+                    const viewsText = video.views ? ` • ${formatViews(video.views)}` : '';
+
+                    card.innerHTML = `
+                        <div class="relative w-28 sm:w-32 aspect-video rounded-lg overflow-hidden bg-black shrink-0 border border-cinema-800">
+                            <img src="${video.thumbnail}" alt="${escapeHtml(video.title)}" onerror="this.src='https://placehold.co/320x180/161821/e11d48?text=YouTube'" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+                            ${durationBadge}
+                        </div>
+                        <div class="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+                            <h5 class="text-xs font-semibold text-gray-100 group-hover:text-rose-400 line-clamp-2 leading-snug transition-colors">${escapeHtml(video.title)}</h5>
+                            <div class="mt-1">
+                                <p class="text-[11px] text-gray-400 truncate">${escapeHtml(video.channel)}</p>
+                                <p class="text-[10px] text-gray-500 truncate">${escapeHtml(viewsText.replace(/^ • /, ''))}</p>
+                            </div>
+                        </div>
+                    `;
+
+                    card.addEventListener('click', () => {
+                        selectYouTubeVideo(video.videoId, video.title);
+                    });
+
+                    ytResultsGrid.appendChild(card);
+                });
+            }
+
+            /**
+             * Seleciona e inicia um vídeo do YouTube para o Host e transmite o comando para todos os Convidados
+             */
+            function selectYouTubeVideo(videoId, title) {
+                if (state.role !== 'host') return;
+
+                // Encerra eventual stream local anterior
+                if (state.currentVideoUrl) {
+                    URL.revokeObjectURL(state.currentVideoUrl);
+                    state.currentVideoUrl = null;
+                }
+                state.guestConnections.forEach((entry) => {
+                    if (entry.call) {
+                        try { entry.call.close(); } catch (e) {}
+                        entry.call = null;
+                    }
+                });
+
+                state.mediaMode = 'youtube';
+                state.youtubeVideoId = videoId;
+                state.youtubeTitle = title || `YouTube (${videoId})`;
+                state.currentFileName = state.youtubeTitle;
+                state.currentFileSize = 0;
+
+                ytResultsDrawer.classList.add('hidden');
+                fileInfoText.innerHTML = `YouTube ativo: <strong class="text-rose-400">${escapeHtml(state.youtubeTitle)}</strong>`;
+
+                loadYouTubeIntoPlayer(videoId, state.youtubeTitle, 0, true);
+
+                // Sincroniza com todos os convidados da sala
+                broadcastToGuests({
+                    type: 'LOAD_YOUTUBE',
+                    videoId: videoId,
+                    title: state.youtubeTitle,
+                    currentTime: 0,
+                    autoplay: true
+                });
+
+                addSystemMessage(`Você iniciou o vídeo do YouTube: "${state.youtubeTitle}".`);
+                showToast('YouTube Carregado!', 'O vídeo foi iniciado para você e todos os convidados da sala.', 'success');
+            }
+
+            /**
+             * Monta ou atualiza o YouTube IFrame Player sincronizado no palco
+             */
+            function loadYouTubeIntoPlayer(videoId, title, startSeconds = 0, autoplay = true) {
+                // Oculta player HTML5 local e placeholder
+                videoEl.pause();
+                videoEl.srcObject = null;
+                videoEl.removeAttribute('src');
+                videoEl.classList.add('hidden');
+                videoPlaceholder.classList.add('hidden');
+
+                // Exibe palco do YouTube e controles customizados sincronizados
+                youtubeStage.classList.remove('hidden');
+                customControls.classList.remove('hidden');
+                activeMediaFooter.classList.remove('hidden');
+
+                activeFileName.textContent = title || `YouTube (${videoId})`;
+                activeFileSize.textContent = 'YouTube HD';
+                syncModeText.textContent = state.role === 'host' ? 'YouTube Sincronizado (Host)' : 'YouTube Sincronizado com o Host';
+
+                if (state.role === 'guest') {
+                    guestFileBadge.textContent = title || 'YouTube';
+                    guestFileBadge.classList.remove('hidden');
+                    guestLocalUploadWrapper.classList.add('hidden');
+                    updateGuestBanner('streaming', `Assistindo vídeo do YouTube sincronizado com o <strong>Host</strong>.`);
+                    updateVideoSyncOverlay('synced', 'Sincronizado com o Host');
+                }
+
+                const initOrLoad = () => {
+                    if (state.ytPlayer && typeof state.ytPlayer.loadVideoById === 'function') {
+                        if (autoplay) {
+                            state.ytPlayer.loadVideoById({ videoId, startSeconds });
+                            updatePlayPauseUI(false);
+                        } else {
+                            state.ytPlayer.cueVideoById({ videoId, startSeconds });
+                            updatePlayPauseUI(true);
+                        }
+                        return;
+                    }
+
+                    // Recria o container interno para o YT.Player substituir pelo iframe
+                    youtubeStage.innerHTML = `
+                        <div id="yt-player-mount" class="w-full h-full"></div>
+                        <div id="yt-click-shield" class="absolute inset-0 z-10 cursor-pointer"></div>
+                    `;
+                    document.getElementById('yt-click-shield').addEventListener('click', () => {
+                        if (state.role === 'host') {
+                            btnPlayPause.click();
+                        }
+                    });
+
+                    state.ytPlayer = new YT.Player('yt-player-mount', {
+                        width: '100%',
+                        height: '100%',
+                        videoId: videoId,
+                        playerVars: {
+                            autoplay: autoplay ? 1 : 0,
+                            controls: 0,
+                            disablekb: 1,
+                            modestbranding: 1,
+                            rel: 0,
+                            playsinline: 1,
+                            start: Math.floor(startSeconds),
+                            origin: window.location.origin
+                        },
+                        events: {
+                            onReady: (event) => {
+                                const vol = Math.round(parseFloat(volumeBar.value) * 100);
+                                event.target.setVolume(vol);
+                                if (autoplay) {
+                                    event.target.playVideo();
+                                    updatePlayPauseUI(false);
+                                }
+                                startYouTubeProgressTracker();
+                            },
+                            onStateChange: (event) => {
+                                // YT.PlayerState: PLAYING = 1, PAUSED = 2, ENDED = 0
+                                if (event.data === 1) {
+                                    updatePlayPauseUI(false);
+                                    const dur = state.ytPlayer.getDuration ? state.ytPlayer.getDuration() : 0;
+                                    if (dur > 0) timeDuration.textContent = formatTime(dur);
+                                } else if (event.data === 2) {
+                                    updatePlayPauseUI(true);
+                                } else if (event.data === 0) {
+                                    updatePlayPauseUI(true);
+                                    if (state.role === 'host') {
+                                        broadcastToGuests({ type: 'VIDEO_PAUSE', currentTime: state.ytPlayer.getDuration() || 0 });
+                                    }
+                                }
+                            }
+                        }
+                    });
+                };
+
+                if (window.ytApiReady && typeof YT !== 'undefined' && YT.Player) {
+                    initOrLoad();
+                } else {
+                    const waitYt = setInterval(() => {
+                        if (window.ytApiReady && typeof YT !== 'undefined' && YT.Player) {
+                            clearInterval(waitYt);
+                            initOrLoad();
+                        }
+                    }, 200);
+                }
+            }
+
+            /**
+             * Atualiza continuamente a barra de tempo enquanto o player do YouTube está ativo
+             */
+            function startYouTubeProgressTracker() {
+                if (state.ytProgressTimer) clearInterval(state.ytProgressTimer);
+                state.ytProgressTimer = setInterval(() => {
+                    if (state.mediaMode !== 'youtube' || !state.ytPlayer || typeof state.ytPlayer.getCurrentTime !== 'function') return;
+                    const curr = state.ytPlayer.getCurrentTime() || 0;
+                    const dur = state.ytPlayer.getDuration() || 0;
+                    if (dur > 0) {
+                        seekBar.value = (curr / dur) * 100;
+                        timeCurrent.textContent = formatTime(curr);
+                        timeDuration.textContent = formatTime(dur);
+                    }
+                }, 400);
+            }
+
+            function destroyYouTubePlayer() {
+                if (state.ytProgressTimer) {
+                    clearInterval(state.ytProgressTimer);
+                    state.ytProgressTimer = null;
+                }
+                if (state.ytPlayer && typeof state.ytPlayer.destroy === 'function') {
+                    try { state.ytPlayer.destroy(); } catch (e) {}
+                }
+                state.ytPlayer = null;
+                youtubeStage.classList.add('hidden');
             }
 
             // ==========================================
@@ -806,6 +779,7 @@
                 state.username = rawName || (role === 'host' ? 'Anfitrião' : 'Convidado_' + Math.floor(Math.random() * 900 + 100));
                 state.roomCode = code.toUpperCase();
                 state.role = role;
+                state.mediaMode = 'none';
                 state.guestConnections.clear();
                 state.participants.clear();
                 state.guestUsingLocalFile = false;
@@ -837,7 +811,7 @@
                     lockedControlsHint.classList.add('hidden');
 
                     placeholderTitle.textContent = 'Sua sala está pronta!';
-                    placeholderSubtitle.textContent = 'Selecione ou arraste um vídeo acima (até 5 GB) para transmitir aos convidados.';
+                    placeholderSubtitle.textContent = 'Pesquise um vídeo no YouTube ou importe um arquivo local (até 5 GB) acima para iniciar.';
                     
                     initHostPeer();
                 } else {
@@ -846,6 +820,7 @@
                     
                     hostUploadPanel.classList.add('hidden');
                     guestStatusBanner.classList.remove('hidden');
+                    guestLocalUploadWrapper.classList.remove('hidden');
                     videoSyncPill.classList.remove('hidden');
                     btnForceSync.classList.add('hidden');
                     btnReconnect.classList.add('hidden');
@@ -873,70 +848,28 @@
              * Inicializa o nó PeerJS do HOST com ID determinístico baseado no código da sala
              */
             function initHostPeer() {
-                if (state.peer) {
-                    try { state.peer.destroy(); } catch (e) {}
-                }
-
-                const hostPeerId = PEER_PREFIX + state.roomCode;
-                state.peer = new Peer(hostPeerId, PEER_CONFIG);
-
-                state.peer.on('open', (id) => {
-                    state.participants.set(id, { username: state.username, role: 'host' });
-                    updateParticipantsUI();
-                    setNetworkStatus('online', 'Online • Pronto para convidados');
-                    addSystemMessage(`Sala ${state.roomCode} criada! Compartilhe o código com seus amigos.`);
-                });
-
-                // Recebe conexões de dados (Chat + Controle) de Convidados
-                state.peer.on('connection', (conn) => {
-                    conn.on('open', () => {
-                        state.guestConnections.set(conn.peer, { conn, call: null, username: 'Convidado' });
-                    });
-
-                    conn.on('data', (data) => {
-                        handleHostReceiveData(conn, data);
-                    });
-
-                    conn.on('close', () => {
-                        const info = state.guestConnections.get(conn.peer);
-                        const leftName = info ? info.username : 'Um convidado';
-                        state.guestConnections.delete(conn.peer);
-                        state.participants.delete(conn.peer);
-                        updateParticipantsUI();
-                        
-                        const leaveMsg = { type: 'SYSTEM_MSG', text: `${leftName} saiu da sala.` };
-                        addSystemMessage(leaveMsg.text);
-                        broadcastToGuests(leaveMsg);
-                        broadcastParticipantsList();
-                    });
-
-                    conn.on('error', (err) => {
-                        console.warn('Erro na conexão com convidado:', err);
-                    });
-                });
-
-                state.peer.on('error', (err) => {
-                    console.error('PeerJS Host Error:', err);
-                    if (err.type === 'unavailable-id') {
-                        // Caso raro de colisão de código: gera um novo automaticamente
-                        const newCode = generateRoomCode();
-                        state.roomCode = newCode;
-                        displayRoomCode.textContent = newCode;
-                        initHostPeer();
-                    } else {
-                        setNetworkStatus('offline', 'Erro na rede P2P');
-                        showToast('Erro de Conexão', 'Não foi possível manter o canal P2P. Verifique sua internet.', 'error');
-                    }
-                });
-
+// ... existing code ... -->
                 // Heartbeat periódico (a cada 3s) para manter o relógio dos convidados perfeitamente alinhado
                 if (state.syncInterval) clearInterval(state.syncInterval);
                 state.syncInterval = setInterval(() => {
-                    if (state.role === 'host' && state.currentVideoUrl && state.guestConnections.size > 0) {
+                    if (state.role !== 'host' || state.guestConnections.size === 0) return;
+
+                    if (state.mediaMode === 'local' && state.currentVideoUrl) {
                         broadcastToGuests({
                             type: 'SYNC_HEARTBEAT',
+                            mediaMode: 'local',
                             currentTime: videoEl.currentTime,
+                            duration: videoEl.duration || 0,
                             paused: videoEl.paused
+                        });
+                    } else if (state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.getCurrentTime === 'function') {
+                        const ytState = state.ytPlayer.getPlayerState ? state.ytPlayer.getPlayerState() : 2;
+                        broadcastToGuests({
+                            type: 'SYNC_HEARTBEAT',
+                            mediaMode: 'youtube',
+                            currentTime: state.ytPlayer.getCurrentTime() || 0,
+                            duration: state.ytPlayer.getDuration() || 0,
+                            paused: ytState !== 1
                         });
                     }
                 }, 3000);
@@ -962,25 +895,40 @@
                         broadcastToGuests({ type: 'SYSTEM_MSG', text: joinText }, conn.peer);
                         broadcastParticipantsList();
 
-                        // Envia confirmação de boas-vindas + metadados do vídeo ativo (se houver)
-                        conn.send({
-                            type: 'WELCOME',
-                            hostName: state.username,
-                            hasVideo: Boolean(state.currentVideoUrl),
-                            fileName: state.currentFileName,
-                            fileSize: state.currentFileSize,
-                            currentTime: videoEl.currentTime || 0,
-                            paused: videoEl.paused
-                        });
+                        // Envia confirmação de boas-vindas + metadados da mídia ativa (YouTube ou Vídeo Local)
+                        if (state.mediaMode === 'youtube' && state.youtubeVideoId) {
+                            const curr = state.ytPlayer && state.ytPlayer.getCurrentTime ? state.ytPlayer.getCurrentTime() : 0;
+                            const ytState = state.ytPlayer && state.ytPlayer.getPlayerState ? state.ytPlayer.getPlayerState() : 1;
+                            conn.send({
+                                type: 'WELCOME',
+                                hostName: state.username,
+                                mediaMode: 'youtube',
+                                youtubeVideoId: state.youtubeVideoId,
+                                youtubeTitle: state.youtubeTitle,
+                                currentTime: curr,
+                                paused: ytState !== 1
+                            });
+                        } else {
+                            conn.send({
+                                type: 'WELCOME',
+                                hostName: state.username,
+                                mediaMode: state.mediaMode,
+                                hasVideo: Boolean(state.currentVideoUrl),
+                                fileName: state.currentFileName,
+                                fileSize: state.currentFileSize,
+                                currentTime: videoEl.currentTime || 0,
+                                paused: videoEl.paused
+                            });
 
-                        // Se já existe um vídeo carregado pelo Host, inicia o stream WebRTC imediatamente para esse convidado!
-                        if (state.currentVideoUrl) {
-                            setTimeout(() => streamVideoToGuest(conn.peer), 400);
+                            // Se já existe um vídeo local carregado pelo Host, inicia o stream WebRTC imediatamente!
+                            if (state.mediaMode === 'local' && state.currentVideoUrl) {
+                                setTimeout(() => streamVideoToGuest(conn.peer), 400);
+                            }
                         }
                         break;
 
                     case 'REQUEST_STREAM':
-                        if (state.currentVideoUrl) {
+                        if (state.mediaMode === 'local' && state.currentVideoUrl) {
                             streamVideoToGuest(conn.peer);
                         }
                         break;
@@ -1002,155 +950,7 @@
             /**
              * Envia dados do Host para todos os convidados conectados (opcionalmente ignorando um peerId)
              */
-            function broadcastToGuests(payload, excludePeerId = null) {
-                state.guestConnections.forEach((entry, peerId) => {
-                    if (peerId !== excludePeerId && entry.conn && entry.conn.open) {
-                        try {
-                            entry.conn.send(payload);
-                        } catch (e) {
-                            console.warn('Falha ao enviar para convidado:', peerId, e);
-                        }
-                    }
-                });
-            }
-
-            function broadcastParticipantsList() {
-                const list = Array.from(state.participants.entries()).map(([id, info]) => ({
-                    id,
-                    username: info.username,
-                    role: info.role
-                }));
-                broadcastToGuests({ type: 'PARTICIPANTS_UPDATE', list });
-            }
-
-            /**
-             * Inicializa o nó PeerJS do CONVIDADO e conecta ao Host da sala
-             */
-            function initGuestPeer() {
-                if (state.peer) {
-                    try { state.peer.destroy(); } catch (e) {}
-                }
-
-                btnReconnect.classList.add('hidden');
-                setNetworkStatus('connecting', 'Conectando ao Host...');
-                updateGuestBanner('connecting', `Conectando ao Host da sala <strong>${state.roomCode}</strong>...`);
-
-                state.peer = new Peer(PEER_CONFIG);
-
-                state.peer.on('open', (myId) => {
-                    const targetHostId = PEER_PREFIX + state.roomCode;
-                    const conn = state.peer.connect(targetHostId, { reliable: true });
-                    state.hostConnection = conn;
-
-                    // Timeout de segurança caso o código da sala não exista
-                    const connectionTimeout = setTimeout(() => {
-                        if (!conn.open) {
-                            setNetworkStatus('offline', 'Sala não encontrada');
-                            updateGuestBanner('error', `Não foi possível encontrar o Host da sala <strong>${state.roomCode}</strong>. Verifique o código.`);
-                            updateVideoSyncOverlay('error', 'Host offline ou código inválido');
-                            placeholderTitle.textContent = 'Host não encontrado';
-                            placeholderSubtitle.textContent = 'Verifique se o código da sala está correto e se o Host está com a sala aberta.';
-                            btnReconnect.classList.remove('hidden');
-                            btnReconnect.classList.add('inline-flex');
-                        }
-                    }, 9000);
-
-                    conn.on('open', () => {
-                        clearTimeout(connectionTimeout);
-                        setNetworkStatus('online', 'Conectado ao Host');
-                        btnReconnect.classList.add('hidden');
-
-                        // Envia pacote JOIN para entrar na sala e no chat
-                        conn.send({
-                            type: 'JOIN',
-                            username: state.username
-                        });
-                    });
-
-                    conn.on('data', (data) => {
-                        handleGuestReceiveData(data);
-                    });
-
-                    conn.on('close', () => {
-                        setNetworkStatus('offline', 'Desconectado do Host');
-                        updateGuestBanner('error', 'A conexão com o Host foi encerrada.');
-                        updateVideoSyncOverlay('error', 'Desconectado do Host');
-                        addSystemMessage('Você foi desconectado do Host.');
-                        btnReconnect.classList.remove('hidden');
-                        btnReconnect.classList.add('inline-flex');
-                    });
-
-                    conn.on('error', (err) => {
-                        console.error('Erro na conexão com Host:', err);
-                        setNetworkStatus('offline', 'Erro de conexão');
-                        btnReconnect.classList.remove('hidden');
-                        btnReconnect.classList.add('inline-flex');
-                    });
-                });
-
-                // Recebe o Stream de Vídeo/Áudio WebRTC enviado pelo Host!
-                state.peer.on('call', (call) => {
-                    state.activeMediaCall = call;
-                    call.answer(); // Responde sem enviar câmera/mic (somente recebe o cinema)
-
-                    call.on('stream', (remoteStream) => {
-                        // Se o convidado não estiver usando um arquivo local manual, exibe o stream do Host
-                        if (!state.guestUsingLocalFile) {
-                            attachRemoteStreamToPlayer(remoteStream, call.metadata);
-                        }
-                    });
-
-                    call.on('close', () => {
-                        if (!state.guestUsingLocalFile) {
-                            updateVideoSyncOverlay('waiting', 'Transmissão encerrada pelo Host');
-                        }
-                    });
-                });
-
-                state.peer.on('error', (err) => {
-                    console.error('PeerJS Guest Error:', err);
-                    setNetworkStatus('offline', 'Falha na conexão P2P');
-                    updateGuestBanner('error', 'Erro ao conectar na sala. Verifique o código e tente novamente.');
-                    btnReconnect.classList.remove('hidden');
-                    btnReconnect.classList.add('inline-flex');
-                });
-            }
-
-            /**
-             * Conecta o MediaStream recebido via WebRTC ao player de vídeo do Convidado
-             */
-            function attachRemoteStreamToPlayer(remoteStream, metadata) {
-                videoPlaceholder.classList.add('hidden');
-                videoEl.classList.remove('hidden');
-                customControls.classList.remove('hidden');
-                activeMediaFooter.classList.remove('hidden');
-
-                if (metadata && metadata.fileName) {
-                    activeFileName.textContent = metadata.fileName;
-                    activeFileSize.textContent = formatBytes(metadata.fileSize || 0);
-                    guestFileBadge.textContent = metadata.fileName;
-                    guestFileBadge.classList.remove('hidden');
-                }
-
-                syncModeText.textContent = 'Transmissão ao Vivo do Host';
-                videoEl.srcObject = remoteStream;
-                
-                // Tenta iniciar reprodução automática; se o navegador bloquear áudio sem clique, inicia mutado e avisa
-                videoEl.play().then(() => {
-                    updatePlayPauseUI(false);
-                    updateGuestBanner('streaming', 'Assistindo transmissão ao vivo sincronizada com o <strong>Host</strong>.');
-                    updateVideoSyncOverlay('synced', 'Sincronizado com o Host');
-                }).catch(() => {
-                    videoEl.muted = true;
-                    updateVolumeIcon();
-                    videoEl.play().catch(() => {});
-                    updatePlayPauseUI(false);
-                    updateGuestBanner('streaming', 'Transmissão recebida! Clique no botão de volume para ativar o som.');
-                    updateVideoSyncOverlay('synced', 'Sincronizado (Clique para ativar som)');
-                    showToast('Áudio Mutado pelo Navegador', 'Clique no ícone de som no player para ouvir o vídeo.', 'warning');
-                });
-            }
-
+// ... existing code ... -->
             /**
              * Processa comandos de controle, sincronização e chat recebidos pelo CONVIDADO
              */
@@ -1160,11 +960,18 @@
                 switch (data.type) {
                     case 'WELCOME':
                         addSystemMessage(`Conectado à sala de ${data.hostName}!`);
-                        if (data.hasVideo) {
+                        if (data.mediaMode === 'youtube' && data.youtubeVideoId) {
+                            state.mediaMode = 'youtube';
+                            state.youtubeVideoId = data.youtubeVideoId;
+                            state.youtubeTitle = data.youtubeTitle;
+                            loadYouTubeIntoPlayer(data.youtubeVideoId, data.youtubeTitle, data.currentTime || 0, !data.paused);
+                        } else if (data.hasVideo) {
+                            state.mediaMode = 'local';
                             state.currentFileName = data.fileName;
                             state.currentFileSize = data.fileSize;
                             guestFileBadge.textContent = data.fileName;
                             guestFileBadge.classList.remove('hidden');
+                            guestLocalUploadWrapper.classList.remove('hidden');
                             activeFileName.textContent = data.fileName;
                             activeFileSize.textContent = formatBytes(data.fileSize);
 
@@ -1173,18 +980,30 @@
                             placeholderTitle.textContent = 'Carregando transmissão do Host...';
                             placeholderSubtitle.textContent = `O Host está exibindo "${data.fileName}". O vídeo iniciará em instantes.`;
                         } else {
-                            updateGuestBanner('connected', 'Conectado! Aguardando o <strong>Host</strong> selecionar um vídeo.');
+                            updateGuestBanner('connected', 'Conectado! Aguardando o <strong>Host</strong> escolher um vídeo.');
                             updateVideoSyncOverlay('waiting', 'Aguardando vídeo do Host');
                             placeholderTitle.textContent = 'Conectado à sala!';
-                            placeholderSubtitle.textContent = 'Aguardando o Host carregar um arquivo de vídeo para começar.';
+                            placeholderSubtitle.textContent = 'Aguardando o Host selecionar um vídeo do YouTube ou arquivo local.';
                         }
                         break;
 
+                    case 'LOAD_YOUTUBE':
+                        state.mediaMode = 'youtube';
+                        state.guestUsingLocalFile = false;
+                        state.youtubeVideoId = data.videoId;
+                        state.youtubeTitle = data.title;
+                        loadYouTubeIntoPlayer(data.videoId, data.title, data.currentTime || 0, data.autoplay !== false);
+                        addSystemMessage(`O Host iniciou o vídeo do YouTube: "${data.title}".`);
+                        break;
+
                     case 'VIDEO_LOADED':
+                        destroyYouTubePlayer();
+                        state.mediaMode = 'local';
                         state.currentFileName = data.fileName;
                         state.currentFileSize = data.fileSize;
                         guestFileBadge.textContent = data.fileName;
                         guestFileBadge.classList.remove('hidden');
+                        guestLocalUploadWrapper.classList.remove('hidden');
                         activeFileName.textContent = data.fileName;
                         activeFileSize.textContent = formatBytes(data.fileSize);
                         
@@ -1196,7 +1015,15 @@
                         break;
 
                     case 'VIDEO_PLAY':
-                        if (videoEl.src || videoEl.srcObject) {
+                        if (state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.playVideo === 'function') {
+                            const curr = state.ytPlayer.getCurrentTime ? state.ytPlayer.getCurrentTime() : 0;
+                            if (typeof data.currentTime === 'number' && Math.abs(curr - data.currentTime) > 1.0) {
+                                state.ytPlayer.seekTo(data.currentTime, true);
+                            }
+                            state.ytPlayer.playVideo();
+                            updatePlayPauseUI(false);
+                            updateVideoSyncOverlay('synced', 'Sincronizado com o Host');
+                        } else if (videoEl.src || videoEl.srcObject) {
                             if (state.guestUsingLocalFile && Math.abs(videoEl.currentTime - data.currentTime) > 0.6) {
                                 videoEl.currentTime = data.currentTime;
                             }
@@ -1207,7 +1034,14 @@
                         break;
 
                     case 'VIDEO_PAUSE':
-                        if (videoEl.src || videoEl.srcObject) {
+                        if (state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.pauseVideo === 'function') {
+                            state.ytPlayer.pauseVideo();
+                            if (typeof data.currentTime === 'number') {
+                                state.ytPlayer.seekTo(data.currentTime, true);
+                            }
+                            updatePlayPauseUI(true);
+                            updateVideoSyncOverlay('synced', 'Pausado pelo Host');
+                        } else if (videoEl.src || videoEl.srcObject) {
                             videoEl.pause();
                             if (state.guestUsingLocalFile) {
                                 videoEl.currentTime = data.currentTime;
@@ -1218,15 +1052,34 @@
                         break;
 
                     case 'VIDEO_SEEK':
-                        if (state.guestUsingLocalFile && videoEl.src) {
+                        if (state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.seekTo === 'function') {
+                            state.ytPlayer.seekTo(data.currentTime, true);
+                            updateVideoSyncOverlay('synced', 'Sincronizado com o Host');
+                        } else if (state.guestUsingLocalFile && videoEl.src) {
                             videoEl.currentTime = data.currentTime;
+                            updateVideoSyncOverlay('synced', 'Sincronizado com o Host');
                         }
-                        updateVideoSyncOverlay('synced', 'Sincronizado com o Host');
                         break;
 
                     case 'SYNC_HEARTBEAT':
+                        if (data.mediaMode === 'youtube' && state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.getCurrentTime === 'function') {
+                            const curr = state.ytPlayer.getCurrentTime() || 0;
+                            if (Math.abs(curr - data.currentTime) > 1.8) {
+                                state.ytPlayer.seekTo(data.currentTime, true);
+                            }
+                            const ytState = state.ytPlayer.getPlayerState ? state.ytPlayer.getPlayerState() : 2;
+                            if (data.paused && ytState === 1) {
+                                state.ytPlayer.pauseVideo();
+                                updatePlayPauseUI(true);
+                            } else if (!data.paused && ytState !== 1) {
+                                state.ytPlayer.playVideo();
+                                updatePlayPauseUI(false);
+                            }
+                            break;
+                        }
+
                         // Atualiza duração e barra visual mesmo no modo stream
-                        if (data.duration && !state.guestUsingLocalFile) {
+                        if (data.duration && !state.guestUsingLocalFile && state.mediaMode === 'local') {
                             timeCurrent.textContent = formatTime(data.currentTime);
                             timeDuration.textContent = formatTime(data.duration);
                             seekBar.value = (data.currentTime / data.duration) * 100;
@@ -1264,14 +1117,7 @@
             }
 
             function updateParticipantsUI() {
-                const count = Math.max(1, state.participants.size);
-                viewerCountEl.textContent = count;
-                const names = Array.from(state.participants.values())
-                    .map(p => `${p.username}${p.role === 'host' ? ' (Host)' : ''}`)
-                    .join(', ');
-                viewersPill.title = `Na sala: ${names}`;
-            }
-
+// ... existing code ... -->
             /**
              * Sai da sala e limpa todas as conexões P2P e streams
              */
@@ -1280,6 +1126,7 @@
                     clearInterval(state.syncInterval);
                     state.syncInterval = null;
                 }
+                destroyYouTubePlayer();
                 if (state.activeMediaCall) {
                     try { state.activeMediaCall.close(); } catch (e) {}
                     state.activeMediaCall = null;
@@ -1311,11 +1158,14 @@
                 videoEl.classList.add('hidden');
                 customControls.classList.add('hidden');
                 activeMediaFooter.classList.add('hidden');
+                ytResultsDrawer.classList.add('hidden');
                 videoPlaceholder.classList.remove('hidden');
                 chatMessages.innerHTML = '';
 
                 state.roomCode = null;
                 state.role = null;
+                state.mediaMode = 'none';
+                state.youtubeVideoId = null;
                 state.guestUsingLocalFile = false;
 
                 roomView.classList.add('hidden');
@@ -1341,11 +1191,17 @@
                     return;
                 }
 
+                // Encerra player do YouTube caso estivesse ativo
+                destroyYouTubePlayer();
+                ytResultsDrawer.classList.add('hidden');
+
                 if (state.currentVideoUrl) {
                     URL.revokeObjectURL(state.currentVideoUrl);
                 }
 
                 const objectUrl = URL.createObjectURL(file);
+                state.mediaMode = 'local';
+                state.youtubeVideoId = null;
                 state.currentVideoUrl = objectUrl;
                 state.currentFileName = file.name;
                 state.currentFileSize = file.size;
@@ -1365,7 +1221,7 @@
                 updatePlayPauseUI(true);
 
                 uploadBtnLabel.textContent = 'Trocar Vídeo';
-                fileInfoText.innerHTML = `Arquivo ativo: <strong class="text-emerald-400">${file.name}</strong> (${formatBytes(file.size)})`;
+                fileInfoText.innerHTML = `Arquivo ativo: <strong class="text-emerald-400">${escapeHtml(file.name)}</strong> (${formatBytes(file.size)})`;
 
                 // Avisa os convidados sobre o novo vídeo e inicia o stream WebRTC
                 broadcastToGuests({
@@ -1386,61 +1242,40 @@
                 handleHostFileSelection(e.target.files[0]);
             });
 
-            // Suporte a Drag & Drop no painel de upload do Host
-            hostUploadPanel.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                hostUploadPanel.classList.add('border-rose-500', 'bg-cinema-800/80');
-            });
-
-            hostUploadPanel.addEventListener('dragleave', () => {
-                hostUploadPanel.classList.remove('border-rose-500', 'bg-cinema-800/80');
-            });
-
-            hostUploadPanel.addEventListener('drop', (e) => {
-                e.preventDefault();
-                hostUploadPanel.classList.remove('border-rose-500', 'bg-cinema-800/80');
-                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                    handleHostFileSelection(e.dataTransfer.files[0]);
+            // Eventos da Barra de Pesquisa do YouTube
+            ytSearchInput.addEventListener('input', () => {
+                if (ytSearchInput.value.trim().length > 0) {
+                    btnClearYtSearch.classList.remove('hidden');
+                } else {
+                    btnClearYtSearch.classList.add('hidden');
                 }
             });
 
-            // Modo Híbrido Opcional: Convidado carrega cópia local do arquivo para qualidade 4K nativa
-            guestLocalFileInput.addEventListener('change', (e) => {
-                if (state.role !== 'guest') return;
-                const file = e.target.files[0];
-                if (!file) return;
+            btnClearYtSearch.addEventListener('click', () => {
+                ytSearchInput.value = '';
+                btnClearYtSearch.classList.add('hidden');
+                ytResultsDrawer.classList.add('hidden');
+                ytSearchInput.focus();
+            });
 
-                if (file.size > MAX_FILE_SIZE_BYTES) {
-                    showToast('Limite Excedido', 'O arquivo local deve ter no máximo 5 GB.', 'error');
+            btnCloseYtResults.addEventListener('click', () => {
+                ytResultsDrawer.classList.add('hidden');
+            });
+
+            ytSearchForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                if (state.role !== 'host') return;
+                const query = ytSearchInput.value.trim();
+                if (!query) {
+                    showToast('Pesquisa Vazia', 'Digite o nome de um vídeo ou cole um link do YouTube.', 'warning');
+                    ytSearchInput.focus();
                     return;
                 }
-
-                if (state.currentVideoUrl) {
-                    URL.revokeObjectURL(state.currentVideoUrl);
-                }
-
-                const localUrl = URL.createObjectURL(file);
-                state.currentVideoUrl = localUrl;
-                state.guestUsingLocalFile = true;
-
-                videoPlaceholder.classList.add('hidden');
-                videoEl.classList.remove('hidden');
-                customControls.classList.remove('hidden');
-                activeMediaFooter.classList.remove('hidden');
-
-                videoEl.srcObject = null;
-                videoEl.src = localUrl;
-                videoEl.load();
-
-                activeFileName.textContent = file.name;
-                activeFileSize.textContent = formatBytes(file.size);
-                syncModeText.textContent = 'Arquivo Local Sincronizado (Qualidade Nativa)';
-                guestLocalLabel.textContent = 'Arquivo local ativo';
-                updateGuestBanner('streaming', `Modo Híbrido: Usando arquivo local <strong>"${file.name}"</strong> sincronizado com o Host.`);
-                updateVideoSyncOverlay('synced', 'Arquivo Local Sincronizado');
-                addSystemMessage(`Você ativou o modo de arquivo local (${file.name}) sincronizado com o Host.`);
+                searchYouTubeVideos(query);
             });
 
+            // Suporte a Drag & Drop no painel de upload do Host
+// ... existing code ... -->
             // ==========================================
             // CONTROLES DO PLAYER DE VÍDEO
             // ==========================================
@@ -1455,9 +1290,26 @@
                 }
             }
 
-            // Botão Play/Pause (Apenas Host)
+            // Botão Play/Pause (Apenas Host — suporta YouTube e Vídeo Local)
             btnPlayPause.addEventListener('click', () => {
-                if (state.role !== 'host' || !videoEl.src) return;
+                if (state.role !== 'host') return;
+
+                if (state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.getPlayerState === 'function') {
+                    const ytState = state.ytPlayer.getPlayerState();
+                    const curr = state.ytPlayer.getCurrentTime ? state.ytPlayer.getCurrentTime() : 0;
+                    if (ytState !== 1) {
+                        state.ytPlayer.playVideo();
+                        updatePlayPauseUI(false);
+                        broadcastToGuests({ type: 'VIDEO_PLAY', currentTime: curr });
+                    } else {
+                        state.ytPlayer.pauseVideo();
+                        updatePlayPauseUI(true);
+                        broadcastToGuests({ type: 'VIDEO_PAUSE', currentTime: curr });
+                    }
+                    return;
+                }
+
+                if (!videoEl.src) return;
                 if (videoEl.paused) {
                     videoEl.play();
                     updatePlayPauseUI(false);
@@ -1475,61 +1327,87 @@
                 }
             });
 
+            ytClickShield.addEventListener('click', () => {
+                if (state.role === 'host') {
+                    btnPlayPause.click();
+                }
+            });
+
             // Voltar 10 segundos (Apenas Host)
             btnRewind.addEventListener('click', () => {
-                if (state.role !== 'host' || !videoEl.src) return;
+                if (state.role !== 'host') return;
+
+                if (state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.seekTo === 'function') {
+                    const target = Math.max(0, (state.ytPlayer.getCurrentTime() || 0) - 10);
+                    state.ytPlayer.seekTo(target, true);
+                    timeCurrent.textContent = formatTime(target);
+                    broadcastToGuests({ type: 'VIDEO_SEEK', currentTime: target });
+                    return;
+                }
+
+                if (!videoEl.src) return;
                 videoEl.currentTime = Math.max(0, videoEl.currentTime - 10);
                 broadcastToGuests({ type: 'VIDEO_SEEK', currentTime: videoEl.currentTime });
             });
 
             // Avançar 10 segundos (Apenas Host)
             btnForward.addEventListener('click', () => {
-                if (state.role !== 'host' || !videoEl.src) return;
+                if (state.role !== 'host') return;
+
+                if (state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.seekTo === 'function') {
+                    const dur = state.ytPlayer.getDuration() || 0;
+                    const target = Math.min(dur, (state.ytPlayer.getCurrentTime() || 0) + 10);
+                    state.ytPlayer.seekTo(target, true);
+                    timeCurrent.textContent = formatTime(target);
+                    broadcastToGuests({ type: 'VIDEO_SEEK', currentTime: target });
+                    return;
+                }
+
+                if (!videoEl.src) return;
                 videoEl.currentTime = Math.min(videoEl.duration || 0, videoEl.currentTime + 10);
                 broadcastToGuests({ type: 'VIDEO_SEEK', currentTime: videoEl.currentTime });
             });
 
             // Barra de Progresso (Seekbar - Apenas Host)
             seekBar.addEventListener('input', () => {
-                if (state.role !== 'host' || !videoEl.src) return;
-                const seekTo = (seekBar.value / 100) * (videoEl.duration || 0);
+                if (state.role !== 'host') return;
+                const dur = state.mediaMode === 'youtube' && state.ytPlayer && state.ytPlayer.getDuration
+                    ? (state.ytPlayer.getDuration() || 0)
+                    : (videoEl.duration || 0);
+                if (!dur) return;
+                const seekTo = (seekBar.value / 100) * dur;
                 timeCurrent.textContent = formatTime(seekTo);
             });
 
             seekBar.addEventListener('change', () => {
-                if (state.role !== 'host' || !videoEl.src) return;
+                if (state.role !== 'host') return;
+
+                if (state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.seekTo === 'function') {
+                    const dur = state.ytPlayer.getDuration() || 0;
+                    const seekTo = (seekBar.value / 100) * dur;
+                    state.ytPlayer.seekTo(seekTo, true);
+                    broadcastToGuests({ type: 'VIDEO_SEEK', currentTime: seekTo });
+                    return;
+                }
+
+                if (!videoEl.src) return;
                 const seekTo = (seekBar.value / 100) * (videoEl.duration || 0);
                 videoEl.currentTime = seekTo;
                 broadcastToGuests({ type: 'VIDEO_SEEK', currentTime: seekTo });
             });
 
             // Atualização contínua do tempo do vídeo
-            videoEl.addEventListener('timeupdate', () => {
-                if (!videoEl.duration || !isFinite(videoEl.duration)) return;
-                const progress = (videoEl.currentTime / videoEl.duration) * 100;
-                seekBar.value = progress;
-                timeCurrent.textContent = formatTime(videoEl.currentTime);
-            });
-
-            videoEl.addEventListener('loadedmetadata', () => {
-                if (isFinite(videoEl.duration)) {
-                    timeDuration.textContent = formatTime(videoEl.duration);
-                    seekBar.value = 0;
-                }
-            });
-
-            videoEl.addEventListener('ended', () => {
-                updatePlayPauseUI(true);
-                if (state.role === 'host') {
-                    broadcastToGuests({ type: 'VIDEO_PAUSE', currentTime: videoEl.duration });
-                }
-            });
-
+// ... existing code ... -->
             // Controles Locais: Volume, Mudo e Tela Cheia (Disponível para Host e Convidado)
             volumeBar.addEventListener('input', (e) => {
                 const vol = parseFloat(e.target.value);
                 videoEl.volume = vol;
                 videoEl.muted = vol === 0;
+                if (state.ytPlayer && typeof state.ytPlayer.setVolume === 'function') {
+                    state.ytPlayer.setVolume(Math.round(vol * 100));
+                    if (vol === 0) state.ytPlayer.mute();
+                    else state.ytPlayer.unMute();
+                }
                 updateVolumeIcon();
             });
 
@@ -1539,139 +1417,36 @@
                     videoEl.volume = 0.5;
                     volumeBar.value = 0.5;
                 }
+                if (state.ytPlayer && typeof state.ytPlayer.mute === 'function') {
+                    if (videoEl.muted) {
+                        state.ytPlayer.mute();
+                    } else {
+                        state.ytPlayer.unMute();
+                        state.ytPlayer.setVolume(Math.round(parseFloat(volumeBar.value) * 100));
+                    }
+                }
                 updateVolumeIcon();
             });
 
             function updateVolumeIcon() {
-                if (videoEl.muted || videoEl.volume === 0) {
-                    iconVolHigh.classList.add('hidden');
-                    iconVolMute.classList.remove('hidden');
-                } else {
-                    iconVolHigh.classList.remove('hidden');
-                    iconVolMute.classList.add('hidden');
-                }
-            }
-
-            btnFullscreen.addEventListener('click', () => {
-                if (!document.fullscreenElement) {
-                    playerWrapper.requestFullscreen().catch(() => {
-                        showToast('Tela Cheia', 'Não foi possível ativar o modo tela cheia neste navegador.', 'warning');
-                    });
-                } else {
-                    document.exitFullscreen();
-                }
-            });
-
-            // ==========================================
-            // CHAT SINCRONIZADO P2P EM GRUPO
-            // ==========================================
-
-            function addSystemMessage(text) {
-                const div = document.createElement('div');
-                div.className = 'text-center my-2';
-                div.innerHTML = `<span class="inline-block bg-cinema-950 border border-cinema-800 text-gray-400 text-[11px] px-3 py-1 rounded-full">${escapeHtml(text)}</span>`;
-                chatMessages.appendChild(div);
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-            }
-
-            function appendChatMessage(sender, role, text, isSelf) {
-                const wrapper = document.createElement('div');
-                wrapper.className = `flex flex-col ${isSelf ? 'items-end' : 'items-start'}`;
-
-                const badgeHtml = role === 'host'
-                    ? `<span class="text-[10px] bg-rose-500/20 text-rose-400 px-1.5 py-0.2 rounded font-semibold">HOST</span>`
-                    : '';
-
-                const timeStr = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-
-                wrapper.innerHTML = `
-                    <div class="flex items-center gap-1.5 mb-1 px-1">
-                        <span class="text-xs font-semibold ${isSelf ? 'text-rose-400' : 'text-indigo-300'}">${escapeHtml(sender)}</span>
-                        ${badgeHtml}
-                        <span class="text-[10px] text-gray-500">${timeStr}</span>
-                    </div>
-                    <div class="max-w-[85%] px-3.5 py-2 rounded-2xl text-xs sm:text-sm leading-relaxed break-words ${
-                        isSelf 
-                            ? 'bg-rose-600 text-white rounded-tr-sm' 
-                            : 'bg-cinema-800 text-gray-100 border border-cinema-700 rounded-tl-sm'
-                    }">
-                        ${escapeHtml(text)}
-                    </div>
-                `;
-
-                chatMessages.appendChild(wrapper);
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-            }
-
-            function escapeHtml(str) {
-                const div = document.createElement('div');
-                div.textContent = str;
-                return div.innerHTML;
-            }
-
-            chatForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                const text = chatInput.value.trim();
-                if (!text || !state.roomCode) return;
-
-                if (state.role === 'host') {
-                    appendChatMessage(state.username, 'host', text, true);
-                    broadcastToGuests({
-                        type: 'CHAT_MESSAGE',
-                        username: state.username,
-                        role: 'host',
-                        text: text
-                    });
-                    chatInput.value = '';
-                } else {
-                    if (state.hostConnection && state.hostConnection.open) {
-                        appendChatMessage(state.username, 'guest', text, true);
-                        state.hostConnection.send({
-                            type: 'CHAT_MESSAGE',
-                            username: state.username,
-                            role: 'guest',
-                            text: text
-                        });
-                        chatInput.value = '';
-                    } else {
-                        showToast('Chat Desconectado', 'Aguarde a conexão com o Host ser restabelecida para enviar mensagens.', 'warning');
-                    }
-                }
-            });
-
-            // ==========================================
-            // EVENT LISTENERS DE NAVEGAÇÃO E SINCRONIA
-            // ==========================================
-
-            btnCreateRoom.addEventListener('click', () => {
-                const newCode = generateRoomCode();
-                enterRoom(newCode, 'host');
-            });
-
-            btnJoinRoom.addEventListener('click', () => {
-                const code = roomCodeInput.value.trim().toUpperCase();
-                if (code.length !== 6) {
-                    showToast('Código Inválido', 'Por favor, digite um código de sala válido com 6 caracteres.', 'warning');
-                    roomCodeInput.focus();
-                    return;
-                }
-                enterRoom(code, 'guest');
-            });
-
-            roomCodeInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    btnJoinRoom.click();
-                }
-            });
-
-            btnCopyCode.addEventListener('click', () => {
-                if (state.roomCode) copyTextToClipboard(state.roomCode);
-            });
-
+// ... existing code ... -->
             btnForceSync.addEventListener('click', () => {
                 if (state.role !== 'host') return;
+                if (state.mediaMode === 'youtube' && state.youtubeVideoId) {
+                    const curr = state.ytPlayer && state.ytPlayer.getCurrentTime ? state.ytPlayer.getCurrentTime() : 0;
+                    const ytState = state.ytPlayer && state.ytPlayer.getPlayerState ? state.ytPlayer.getPlayerState() : 1;
+                    broadcastToGuests({
+                        type: 'LOAD_YOUTUBE',
+                        videoId: state.youtubeVideoId,
+                        title: state.youtubeTitle,
+                        currentTime: curr,
+                        autoplay: ytState === 1
+                    });
+                    showToast('Sincronização Enviada', 'Vídeo do YouTube e tempo atual reenviados para todos os convidados.', 'success');
+                    return;
+                }
                 if (!state.currentVideoUrl) {
-                    showToast('Nenhum Vídeo', 'Carregue um vídeo primeiro antes de sincronizar.', 'warning');
+                    showToast('Nenhum Vídeo', 'Pesquise um vídeo no YouTube ou carregue um arquivo primeiro antes de sincronizar.', 'warning');
                     return;
                 }
                 streamVideoToAllGuests();
@@ -1683,21 +1458,4 @@
             });
 
             btnReconnect.addEventListener('click', () => {
-                if (state.role === 'guest' && state.roomCode) {
-                    initGuestPeer();
-                }
-            });
-
-            btnLeaveRoom.addEventListener('click', () => {
-                leaveRoom();
-            });
-
-            window.addEventListener('beforeunload', () => {
-                if (state.peer) {
-                    try { state.peer.destroy(); } catch (e) {}
-                }
-            });
-        });
-    </script>
-</body>
-</html>
+// ... existing code ... -->
