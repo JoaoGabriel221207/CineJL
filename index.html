@@ -10,15 +10,273 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- PeerJS for Real P2P Data & WebRTC Media Streaming -->
-    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-    <!-- YouTube IFrame Player API -->
-    <script src="https://www.youtube.com/iframe_api"></script>
+    <!-- Lucide Icons (Deferred so it never blocks rendering) -->
+    <script defer src="https://unpkg.com/lucide@latest"></script>
     <script>
+        window.tailwind = window.tailwind || {};
         tailwind.config = {
-// ... existing code ... -->
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        cinema: {
+                            950: '#09090b',
+                            900: '#111217',
+                            850: '#161821',
+                            800: '#1f222e',
+                            700: '#2d3142',
+                        }
+                    }
+                }
+            }
+        };
+    </script>
+    <style>
+        body {
+            background-color: #09090b;
+            color: #f3f4f6;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #111217;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2d3142;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #e11d48;
+        }
+
+        /* Custom Range Slider for Video Seekbar */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+            cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            height: 6px;
+            border-radius: 9999px;
+            background: rgba(255, 255, 255, 0.18);
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 15px;
+            width: 15px;
+            border-radius: 50%;
+            background: #e11d48;
+            margin-top: -4.5px;
+            box-shadow: 0 0 10px rgba(225, 29, 72, 0.8);
+            transition: transform 0.15s ease;
+        }
+        input[type="range"]:not(:disabled)::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+        input[type="range"]:disabled {
+            cursor: not-allowed;
+            opacity: 0.65;
+        }
+
+        .cinema-glow {
+            box-shadow: 0 0 80px -20px rgba(225, 29, 72, 0.25);
+        }
+
+        /* Responsive YouTube IFrame container */
+        #yt-player-mount iframe,
+        #yt-fallback-iframe {
+            width: 100%;
+            height: 100%;
+            border: 0;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-rose-600 selection:text-white">
+
+    <!-- Toast Notification Container (Replaces native alert()) -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+    <!-- ========================================== -->
+    <!-- VIEW 1: LOBBY (CREATE OR JOIN ROOM)        -->
+    <!-- ========================================== -->
+    <main id="lobby-view" class="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 relative overflow-hidden">
+        <!-- Ambient Cinema Glow -->
+        <div class="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-rose-600/10 rounded-full blur-[120px] pointer-events-none"></div>
+
+        <!-- Brand Header -->
+        <div class="text-center mb-8 sm:mb-10 z-10 max-w-xl">
+            <div class="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-cinema-850 border border-cinema-700/80 text-rose-400 text-xs font-semibold tracking-wider uppercase mb-4 shadow-lg">
+                <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                Sala de Cinema Privada • P2P &amp; YouTube
+            </div>
+            <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight text-white flex items-center justify-center gap-3">
+                <span class="p-2.5 bg-gradient-to-br from-rose-600 to-rose-800 rounded-2xl shadow-lg shadow-rose-600/30">
+                    <i data-lucide="film" class="w-8 h-8 text-white"></i>
+                </span>
+                Cine<span class="text-rose-500">Sync</span>
+            </h1>
+            <p class="mt-3 text-gray-400 text-sm sm:text-base leading-relaxed">
+                Assista a vídeos locais de até <strong class="text-gray-200">5 GB</strong> ou pesquise direto no <strong class="text-gray-200">YouTube</strong> em sincronia perfeita com seus amigos.
+            </p>
+        </div>
+
+        <!-- User Nickname Input -->
+        <div class="w-full max-w-3xl mb-6 z-10">
+            <div class="bg-cinema-900/90 backdrop-blur-md border border-cinema-800 rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-3 shadow-xl">
+                <div class="flex items-center gap-2.5 text-gray-300 text-sm font-medium shrink-0">
+                    <i data-lucide="user-circle" class="w-5 h-5 text-rose-500"></i>
+                    <span>Seu apelido na sala:</span>
+                </div>
+                <input type="text" id="username-input" placeholder="Ex: Lucas, Ana, PipocaMaster..." maxlength="20"
+                    class="w-full bg-cinema-950 border border-cinema-700 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-500 outline-none transition">
+            </div>
+        </div>
+
+        <!-- Action Cards Grid: Create Room vs Find/Join Room -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-3xl z-10">
+            
+            <!-- Card 1: Create Room (Host) -->
+            <div class="bg-cinema-900/90 backdrop-blur-md border border-cinema-800 hover:border-rose-500/50 rounded-3xl p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 shadow-2xl group">
+                <div>
+                    <div class="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-500 mb-5 group-hover:scale-105 transition-transform">
+                        <i data-lucide="clapperboard" class="w-6 h-6"></i>
+                    </div>
+                    <h2 class="text-xl sm:text-2xl font-bold text-white mb-2">Criar uma Sala</h2>
+                    <p class="text-gray-400 text-sm leading-relaxed mb-6">
+                        Torne-se o <span class="text-rose-400 font-semibold">Host</span>. Pesquise vídeos no YouTube ou importe arquivos locais (até 5 GB) e controle Play, Pause e tempo para toda a sala.
+                    </p>
+                </div>
+
+                <div class="space-y-3">
+                    <div class="flex items-center gap-2 text-xs text-gray-400 bg-cinema-950/80 px-3.5 py-2.5 rounded-xl border border-cinema-800">
+                        <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+                        <span>Controle total + YouTube integrado &amp; Stream 5 GB</span>
+                    </div>
+                    <button id="btn-create-room" type="button" class="w-full py-3.5 px-5 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white font-semibold rounded-xl shadow-lg shadow-rose-600/25 flex items-center justify-center gap-2 transition-all active:scale-[0.98]">
+                        <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                        <span>Criar Nova Sala (Host)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Card 2: Find / Join Room (Guest) -->
+            <div class="bg-cinema-900/90 backdrop-blur-md border border-cinema-800 hover:border-indigo-500/50 rounded-3xl p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 shadow-2xl group">
+                <div>
+                    <div class="w-12 h-12 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 mb-5 group-hover:scale-105 transition-transform">
+                        <i data-lucide="search" class="w-6 h-6"></i>
+                    </div>
+                    <h2 class="text-xl sm:text-2xl font-bold text-white mb-2">Encontrar Sala</h2>
+                    <p class="text-gray-400 text-sm leading-relaxed mb-6">
+                        Tem um código de convite? Digite o código de 6 caracteres abaixo para entrar como <span class="text-indigo-400 font-semibold">Convidado</span> e assistir em sincronia.
+                    </p>
+                </div>
+
+                <form id="join-room-form" class="space-y-3">
+                    <div>
+                        <label for="room-code-input" class="sr-only">Código da Sala</label>
+                        <div class="relative">
+                            <input type="text" id="room-code-input" placeholder="CÓDIGO (EX: CINE99)" maxlength="8" required
+                                class="w-full bg-cinema-950 border border-cinema-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-4 py-3 text-center text-lg font-bold tracking-[0.25em] uppercase text-white placeholder-gray-600 outline-none transition">
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full py-3.5 px-5 bg-cinema-800 hover:bg-indigo-600 border border-cinema-700 hover:border-indigo-500 text-white font-semibold rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]">
+                        <i data-lucide="log-in" class="w-5 h-5"></i>
+                        <span>Entrar na Sala</span>
+                    </button>
+                </form>
+            </div>
+
+        </div>
+
+        <!-- Footer Info -->
+        <p class="mt-8 text-xs text-gray-500 text-center max-w-md z-10">
+            Conexão direta P2P entre dispositivos e abas. Arquivos locais são transmitidos diretamente pelo navegador sem envio para servidores externos.
+        </p>
+    </main>
+
+    <!-- ========================================== -->
+    <!-- VIEW 2: CINEMA ROOM (PLAYER + CHAT)        -->
+    <!-- ========================================== -->
+    <div id="room-view" class="hidden flex-1 flex flex-col h-screen max-h-screen overflow-hidden">
+        
+        <!-- Top Navigation Bar -->
+        <header class="bg-cinema-900 border-b border-cinema-800 px-4 py-3 flex flex-wrap items-center justify-between gap-3 shrink-0 z-20">
+            <!-- Left: Brand & Room Code -->
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2 font-bold text-lg text-white">
+                    <span class="p-1.5 bg-rose-600 rounded-lg">
+                        <i data-lucide="film" class="w-4 h-4 text-white"></i>
+                    </span>
+                    <span class="hidden sm:inline">Cine<span class="text-rose-500">Sync</span></span>
+                </div>
+
+                <div class="h-5 w-px bg-cinema-700"></div>
+
+                <!-- Room Code Badge + Copy Button -->
+                <div class="flex items-center gap-2 bg-cinema-950 border border-cinema-700 rounded-xl px-3 py-1.5">
+                    <span class="text-xs text-gray-400">Sala:</span>
+                    <span id="display-room-code" class="font-mono font-bold text-sm text-rose-400 tracking-wider">------</span>
+                    <button id="btn-copy-code" type="button" title="Copiar código da sala" class="p-1 hover:bg-cinema-800 rounded-lg text-gray-400 hover:text-white transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>
+
+                <!-- Role Badge -->
+                <span id="role-badge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/15 border border-rose-500/30 text-rose-400">
+                    <i data-lucide="crown" class="w-3.5 h-3.5"></i>
+                    Host
+                </span>
+
+                <!-- Network Connection Status Pill -->
+                <div id="network-status-pill" class="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-cinema-950 border border-cinema-800 text-gray-400">
+                    <span id="network-dot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                    <span id="network-status-text">Conectando...</span>
+                </div>
+            </div>
+
+            <!-- Right: Connected Viewers, Sync Actions & Leave Button -->
+            <div class="flex items-center gap-2.5">
+                <!-- Online Viewers Count -->
+                <div id="viewers-pill" title="Participantes conectados na sala" class="flex items-center gap-1.5 bg-cinema-950 border border-cinema-800 px-3 py-1.5 rounded-xl text-xs text-gray-300">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <i data-lucide="users" class="w-3.5 h-3.5 text-gray-400"></i>
+                    <span id="viewer-count" class="font-semibold">1</span>
+                </div>
+
+                <!-- Host Force Sync Button -->
+                <button id="btn-force-sync" type="button" title="Reenviar vídeo e tempo atual para todos os convidados" class="hidden items-center gap-1.5 px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 text-xs font-medium rounded-xl transition">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                    <span class="hidden md:inline">Forçar Sincronização</span>
+                </button>
+
+                <!-- Guest Reconnect Button -->
+                <button id="btn-reconnect" type="button" title="Tentar reconectar ao Host" class="hidden items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-medium rounded-xl transition">
+                    <i data-lucide="wifi" class="w-3.5 h-3.5"></i>
+                    <span>Reconectar</span>
+                </button>
+
+                <!-- Leave Room Button -->
+                <button id="btn-leave-room" type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-cinema-800 hover:bg-red-600/90 border border-cinema-700 hover:border-red-500 text-gray-200 hover:text-white text-xs font-semibold rounded-xl transition">
+                    <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+                    <span>Sair</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Theater Workspace -->
+        <div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
+            
             <!-- Left / Center: Video Theater Stage -->
             <section class="flex-1 flex flex-col bg-cinema-950 p-3 sm:p-5 overflow-y-auto">
                 
@@ -143,19 +401,19 @@
                             <!-- Left Playback Controls (Host Only Active, Locked for Guest) -->
                             <div class="flex items-center gap-2 sm:gap-3">
                                 <!-- Play / Pause -->
-                                <button id="btn-play-pause" class="p-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:bg-cinema-800 disabled:text-gray-500 disabled:cursor-not-allowed text-white transition" title="Play / Pause (Apenas Host)">
+                                <button id="btn-play-pause" type="button" class="p-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:bg-cinema-800 disabled:text-gray-500 disabled:cursor-not-allowed text-white transition" title="Play / Pause (Apenas Host)">
                                     <i id="icon-play" data-lucide="play" class="w-4 h-4 fill-current"></i>
                                     <i id="icon-pause" data-lucide="pause" class="w-4 h-4 fill-current hidden"></i>
                                 </button>
 
                                 <!-- Rewind 10s -->
-                                <button id="btn-rewind" class="p-2 rounded-xl bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white transition flex items-center gap-1 text-xs font-semibold" title="Voltar 10s (Apenas Host)">
+                                <button id="btn-rewind" type="button" class="p-2 rounded-xl bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white transition flex items-center gap-1 text-xs font-semibold" title="Voltar 10s (Apenas Host)">
                                     <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
                                     <span class="hidden sm:inline">-10s</span>
                                 </button>
 
                                 <!-- Forward 10s -->
-                                <button id="btn-forward" class="p-2 rounded-xl bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white transition flex items-center gap-1 text-xs font-semibold" title="Avançar 10s (Apenas Host)">
+                                <button id="btn-forward" type="button" class="p-2 rounded-xl bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white transition flex items-center gap-1 text-xs font-semibold" title="Avançar 10s (Apenas Host)">
                                     <span class="hidden sm:inline">+10s</span>
                                     <i data-lucide="rotate-cw" class="w-4 h-4"></i>
                                 </button>
@@ -170,7 +428,7 @@
                             <!-- Right Local Controls (Volume & Fullscreen - Available to EVERYONE) -->
                             <div class="flex items-center gap-2 sm:gap-3">
                                 <!-- Mute / Unmute -->
-                                <button id="btn-mute" class="p-2 rounded-xl hover:bg-white/10 text-gray-200 transition" title="Mudo / Som">
+                                <button id="btn-mute" type="button" class="p-2 rounded-xl hover:bg-white/10 text-gray-200 transition" title="Mudo / Som">
                                     <i id="icon-vol-high" data-lucide="volume-2" class="w-4 h-4"></i>
                                     <i id="icon-vol-mute" data-lucide="volume-x" class="w-4 h-4 hidden text-rose-400"></i>
                                 </button>
@@ -179,7 +437,7 @@
                                 <input type="range" id="volume-bar" min="0" max="1" step="0.05" value="1" class="w-16 sm:w-24">
 
                                 <!-- Fullscreen -->
-                                <button id="btn-fullscreen" class="p-2 rounded-xl hover:bg-white/10 text-gray-200 transition" title="Tela Cheia">
+                                <button id="btn-fullscreen" type="button" class="p-2 rounded-xl hover:bg-white/10 text-gray-200 transition" title="Tela Cheia">
                                     <i data-lucide="maximize" class="w-4 h-4"></i>
                                 </button>
                             </div>
@@ -230,742 +488,1255 @@
         </div>
     </div>
 
-    <!-- Modal for Multi-tab Testing Instructions -->
-    <div id="guest-help-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-cinema-900 border border-cinema-700 rounded-2xl max-w-md w-full p-6 shadow-2xl">
-            <div class="flex items-center justify-between mb-4">
-                <div class="flex items-center gap-2.5">
-                    <div class="p-2 bg-indigo-500/20 rounded-xl text-indigo-400">
-                        <i data-lucide="split-square-horizontal" class="w-5 h-5"></i>
-                    </div>
-                    <h3 class="font-bold text-lg text-white">Testar como Convidado</h3>
-                </div>
-                <button id="btn-close-modal" class="text-gray-400 hover:text-white p-1">
-                    <i data-lucide="x" class="w-5 h-5"></i>
-                </button>
-            </div>
-            <p class="text-sm text-gray-300 leading-relaxed mb-4">
-                Como este aplicativo usa a API nativa <strong>BroadcastChannel</strong>, você pode testar a sincronização em tempo real agora mesmo no seu navegador:
-            </p>
-            <ol class="list-decimal list-inside space-y-2 text-xs sm:text-sm text-gray-400 mb-5 bg-cinema-950 p-4 rounded-xl border border-cinema-800">
-                <li>Copie o código da sala: <strong id="modal-room-code" class="text-rose-400 font-mono">------</strong></li>
-                <li>Abra este mesmo arquivo HTML em uma <strong class="text-gray-200">nova aba</strong> do navegador.</li>
-                <li>Na nova aba, cole o código em <strong class="text-gray-200">"Entrar em uma Sala"</strong>.</li>
-                <li>Dê Play, Pause ou avance o vídeo aqui como Host e veja a segunda aba obedecer instantaneamente!</li>
-            </ol>
-            <div class="flex justify-end gap-2">
-                <button id="btn-modal-copy" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition">
-                    Copiar Código e Fechar
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- JAVASCRIPT APPLICATION LOGIC               -->
-    <!-- ========================================== -->
-    <!-- JAVASCRIPT APPLICATION LOGIC (PEERJS P2P)  -->
-    <!-- ========================================== -->
+    <!-- ========================================================== -->
+    <!-- NON-BLOCKING ASYNC LOADERS FOR PEERJS & YOUTUBE IFRAME API -->
+    <!-- ========================================================== -->
     <script>
-        // Callback global exigida pela YouTube IFrame Player API
-        window.ytApiReady = false;
-        window.onYouTubeIframeAPIReady = function () {
-            window.ytApiReady = true;
+        // Estado global seguro de carregamento das APIs externas
+        window.CineSyncExternal = {
+            peerLoaded: false,
+            peerError: false,
+            ytApiReady: false,
+            ytApiError: false
         };
 
-        /**
-         * CineSync - Aplicação de Sala de Cinema Sincronizada
-         * Arquitetura Peer-to-Peer Real com PeerJS (WebRTC DataChannels + MediaStream)
-         * + Busca Integrada do YouTube (Piped / Invidious APIs) e Player YouTube Sincronizado.
-         */
-        document.addEventListener('DOMContentLoaded', () => {
-            // Inicializa ícones Lucide
-            lucide.createIcons();
+        window.onYouTubeIframeAPIReady = function () {
+            window.CineSyncExternal.ytApiReady = true;
+        };
 
-            // Constante de limite máximo: 5 GB em bytes
-            const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024 * 1024; // 5.368.709.120 bytes
-            const PEER_PREFIX = 'cinesync-v2-room-';
+        // Carrega PeerJS de forma assíncrona sem bloquear a abertura da página
+        (function loadPeerJsSafely() {
+            try {
+                const script = document.createElement('script');
+                script.src = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
+                script.async = true;
+                script.onload = function () {
+                    window.CineSyncExternal.peerLoaded = typeof window.Peer !== 'undefined';
+                };
+                script.onerror = function () {
+                    window.CineSyncExternal.peerError = true;
+                };
+                document.head.appendChild(script);
+            } catch (e) {
+                window.CineSyncExternal.peerError = true;
+            }
+        })();
 
-            // Instâncias públicas para busca no YouTube compatíveis com navegador (CORS habilitado)
-            const PIPED_INSTANCES = [
-                'https://pipedapi.kavin.rocks',
-                'https://pipedapi.adminforge.de',
-                'https://api.piped.private.coffee',
-                'https://pipedapi.leptons.xyz'
-            ];
+        // Carrega YouTube IFrame API de forma assíncrona e segura
+        (function loadYouTubeApiSafely() {
+            try {
+                const tag = document.createElement('script');
+                tag.src = 'https://www.youtube.com/iframe_api';
+                tag.async = true;
+                tag.onerror = function () {
+                    window.CineSyncExternal.ytApiError = true;
+                };
+                document.head.appendChild(tag);
+            } catch (e) {
+                window.CineSyncExternal.ytApiError = true;
+            }
+        })();
+    </script>
 
-            const INVIDIOUS_INSTANCES = [
-                'https://inv.nadeko.net',
-                'https://invidious.nerdvpn.de',
-                'https://invidious.privacyredirect.com'
-            ];
-
-            // Configuração de servidores STUN públicos gratuitos para atravessar NAT/Roteadores
-            const PEER_CONFIG = {
-                debug: 1,
-                config: {
-                    iceServers: [
-                        { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun1.l.google.com:19302' },
-                        { urls: 'stun:stun2.l.google.com:19302' },
-                        { urls: 'stun:global.stun.twilio.com:3478' }
-                    ]
-                }
-            };
-
-            // Estado da Aplicação (In-Memory)
-            const state = {
-                roomCode: null,
-                role: null, // 'host' | 'guest'
-                username: 'Espectador',
-                peer: null,
-                hostConnection: null, // DataConnection usada pelo Guest para falar com o Host
-                guestConnections: new Map(), // Map<peerId, { conn, call, username }> usado pelo Host
-                participants: new Map(), // Map<peerId, { username, role }>
-                mediaMode: 'none', // 'none' | 'local' | 'youtube'
-                currentVideoUrl: null,
-                currentFileName: null,
-                currentFileSize: 0,
-                youtubeVideoId: null,
-                youtubeTitle: null,
-                ytPlayer: null,
-                ytProgressTimer: null,
-                guestUsingLocalFile: false, // Se o convidado optou por carregar arquivo local
-                activeMediaCall: null,
-                syncInterval: null
-            };
-
-            // Referências DOM - Lobby
-// ... existing code ... -->
-            // Referências DOM - Upload & Player
-            const hostUploadPanel = document.getElementById('host-upload-panel');
-            const ytSearchForm = document.getElementById('yt-search-form');
-            const ytSearchInput = document.getElementById('yt-search-input');
-            const btnClearYtSearch = document.getElementById('btn-clear-yt-search');
-            const btnYtSearch = document.getElementById('btn-yt-search');
-            const ytResultsDrawer = document.getElementById('yt-results-drawer');
-            const ytResultsTitle = document.getElementById('yt-results-title');
-            const ytResultsGrid = document.getElementById('yt-results-grid');
-            const btnCloseYtResults = document.getElementById('btn-close-yt-results');
-
-            const guestStatusBanner = document.getElementById('guest-status-banner');
-            const guestBannerIcon = document.getElementById('guest-banner-icon');
-            const guestBannerText = document.getElementById('guest-banner-text');
-            const guestFileBadge = document.getElementById('guest-file-badge');
-            const guestLocalUploadWrapper = document.getElementById('guest-local-upload-wrapper');
-            const guestLocalFileInput = document.getElementById('guest-local-file-input');
-            const guestLocalLabel = document.getElementById('guest-local-label');
-            const videoFileInput = document.getElementById('video-file-input');
-            const uploadBtnLabel = document.getElementById('upload-btn-label');
-            const fileInfoText = document.getElementById('file-info-text');
-
-            const playerWrapper = document.getElementById('player-wrapper');
-            const videoPlaceholder = document.getElementById('video-placeholder');
-            const placeholderTitle = document.getElementById('placeholder-title');
-            const placeholderSubtitle = document.getElementById('placeholder-subtitle');
-            const videoEl = document.getElementById('cinema-video');
-            const youtubeStage = document.getElementById('youtube-stage');
-            const ytClickShield = document.getElementById('yt-click-shield');
-            const videoSyncPill = document.getElementById('video-sync-pill');
-            const videoSyncDot = document.getElementById('video-sync-dot');
-            const videoSyncText = document.getElementById('video-sync-text');
-            const customControls = document.getElementById('custom-controls');
-
-            // Controles do Player
-// ... existing code ... -->
-            /**
-             * Inicia chamada de mídia WebRTC do Host para um Convidado específico
-             */
-            function streamVideoToGuest(guestPeerId) {
-                if (state.role !== 'host' || !state.peer || state.mediaMode !== 'local' || !state.currentVideoUrl) return;
-                
-                const stream = getHostVideoStream();
-                if (!stream) {
-                    showToast('Aviso de Transmissão', 'Seu navegador restringiu a captura direta de stream. Os convidados ainda podem usar o modo arquivo local.', 'warning');
-                    return;
-                }
-
-                const guestEntry = state.guestConnections.get(guestPeerId);
-                if (guestEntry && guestEntry.call) {
-                    try { guestEntry.call.close(); } catch (e) {}
-                }
-
-                const call = state.peer.call(guestPeerId, stream, {
-                    metadata: {
-                        fileName: state.currentFileName,
-                        fileSize: state.currentFileSize
+    <!-- ========================================== -->
+    <!-- JAVASCRIPT APPLICATION LOGIC (SAFE INIT)   -->
+    <!-- ========================================== -->
+    <script>
+        (function initCineSyncApp() {
+            // Renderiza ícones Lucide assim que disponível (sem travar se offline)
+            function refreshIcons(rootEl) {
+                try {
+                    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                        if (rootEl) {
+                            window.lucide.createIcons({ root: rootEl });
+                        } else {
+                            window.lucide.createIcons();
+                        }
                     }
-                });
-
-                if (guestEntry) {
-                    guestEntry.call = call;
+                } catch (e) {
+                    // Ignora falhas de ícones em ambientes restritos
                 }
             }
 
-            /**
-             * Transmite o vídeo ativo para TODOS os convidados conectados na sala
-             */
-            function streamVideoToAllGuests() {
-                if (state.role !== 'host' || state.mediaMode !== 'local' || !state.currentVideoUrl) return;
-                state.guestConnections.forEach((_, guestPeerId) => {
-                    streamVideoToGuest(guestPeerId);
-                });
+            // Garante execução imediata caso o DOM já esteja pronto ou no DOMContentLoaded
+            function onReady(fn) {
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', fn);
+                } else {
+                    fn();
+                }
             }
 
-            // ==========================================
-            // PESQUISA YOUTUBE & PLAYER SINCRONIZADO
-            // ==========================================
+            onReady(() => {
+                refreshIcons();
 
-            /**
-             * Extrai o ID de 11 caracteres de links do YouTube (watch, youtu.be, shorts, embed) ou ID direto
-             */
-            function extractYouTubeId(input) {
-                if (!input) return null;
-                const trimmed = input.trim();
-                if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
-                    return trimmed;
-                }
-                const patterns = [
-                    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/|youtube\.com\/live\/)([a-zA-Z0-9_-]{11})/,
-                    /[?&]v=([a-zA-Z0-9_-]{11})/
+                // Constante de limite máximo: 5 GB em bytes
+                const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024 * 1024; // 5.368.709.120 bytes
+                const PEER_PREFIX = 'cinesync-v3-room-';
+
+                // Instâncias públicas para busca no YouTube compatíveis com navegador (CORS habilitado)
+                const PIPED_INSTANCES = [
+                    'https://pipedapi.kavin.rocks',
+                    'https://pipedapi.adminforge.de',
+                    'https://api.piped.private.coffee',
+                    'https://pipedapi.leptons.xyz'
                 ];
-                for (const regex of patterns) {
-                    const match = trimmed.match(regex);
-                    if (match && match[1]) return match[1];
-                }
-                return null;
-            }
 
-            function formatViews(views) {
-                if (!views || isNaN(views)) return '';
-                if (views >= 1000000) return (views / 1000000).toFixed(1).replace('.0', '') + ' mi de visualizações';
-                if (views >= 1000) return Math.floor(views / 1000) + ' mil visualizações';
-                return views + ' visualizações';
-            }
+                const INVIDIOUS_INSTANCES = [
+                    'https://inv.nadeko.net',
+                    'https://invidious.nerdvpn.de',
+                    'https://invidious.privacyredirect.com'
+                ];
 
-            /**
-             * Busca vídeos no YouTube usando APIs públicas (Piped com fallback para Invidious)
-             */
-            async function searchYouTubeVideos(query) {
-                const directId = extractYouTubeId(query);
-                ytResultsDrawer.classList.remove('hidden');
-                ytResultsTitle.textContent = `Buscando "${query}" no YouTube...`;
-                ytResultsGrid.innerHTML = `
-                    <div class="col-span-full py-8 flex flex-col items-center justify-center text-gray-400 gap-2">
-                        <i data-lucide="loader-2" class="w-6 h-6 text-rose-500 animate-spin"></i>
-                        <span class="text-xs">Pesquisando vídeos relacionados...</span>
-                    </div>
-                `;
-                lucide.createIcons({ root: ytResultsGrid });
-
-                // Se o usuário colou um link direto ou ID do YouTube, exibe o card imediato além de tentar buscar detalhes
-                if (directId) {
-                    renderYouTubeResults([{
-                        videoId: directId,
-                        title: `Vídeo do YouTube (${directId})`,
-                        channel: 'Link Direto do YouTube',
-                        duration: null,
-                        views: null,
-                        thumbnail: `https://i.ytimg.com/vi/${directId}/hqdefault.jpg`
-                    }], `Vídeo encontrado pelo link`);
-                    return;
-                }
-
-                // 1. Tenta instâncias Piped API
-                for (const baseUrl of PIPED_INSTANCES) {
-                    try {
-                        const controller = new AbortController();
-                        const timeoutId = setTimeout(() => controller.abort(), 5500);
-                        const res = await fetch(`${baseUrl}/search?q=${encodeURIComponent(query)}&filter=videos`, {
-                            signal: controller.signal
-                        });
-                        clearTimeout(timeoutId);
-
-                        if (!res.ok) continue;
-                        const data = await res.json();
-                        const items = (data.items || [])
-                            .filter(item => item.type === 'stream' && item.url)
-                            .map(item => {
-                                const vid = extractYouTubeId(item.url);
-                                return {
-                                    videoId: vid,
-                                    title: item.title || 'Sem título',
-                                    channel: item.uploaderName || 'Canal do YouTube',
-                                    duration: item.duration > 0 ? formatTime(item.duration) : 'AO VIVO',
-                                    views: item.views,
-                                    thumbnail: item.thumbnail || (vid ? `https://i.ytimg.com/vi/${vid}/hqdefault.jpg` : '')
-                                };
-                            })
-                            .filter(v => v.videoId);
-
-                        if (items.length > 0) {
-                            renderYouTubeResults(items.slice(0, 12), `Resultados para "${query}"`);
-                            return;
-                        }
-                    } catch (err) {
-                        // Continua para a próxima instância
+                // Configuração de servidores STUN públicos gratuitos para atravessar NAT/Roteadores
+                const PEER_CONFIG = {
+                    debug: 0,
+                    config: {
+                        iceServers: [
+                            { urls: 'stun:stun.l.google.com:19302' },
+                            { urls: 'stun:stun1.l.google.com:19302' },
+                            { urls: 'stun:stun2.l.google.com:19302' },
+                            { urls: 'stun:global.stun.twilio.com:3478' }
+                        ]
                     }
-                }
+                };
 
-                // 2. Fallback para instâncias Invidious API
-                for (const baseUrl of INVIDIOUS_INSTANCES) {
-                    try {
-                        const controller = new AbortController();
-                        const timeoutId = setTimeout(() => controller.abort(), 5500);
-                        const res = await fetch(`${baseUrl}/api/v1/search?q=${encodeURIComponent(query)}&type=video`, {
-                            signal: controller.signal
-                        });
-                        clearTimeout(timeoutId);
+                // Estado da Aplicação (In-Memory)
+                const state = {
+                    roomCode: null,
+                    role: null, // 'host' | 'guest'
+                    username: 'Espectador',
+                    peer: null,
+                    broadcastChannel: null, // Fallback automático para abas locais caso PeerJS seja bloqueado
+                    hostConnection: null,
+                    guestConnections: new Map(), // Map<peerId, { conn, call, username }>
+                    participants: new Map(), // Map<peerId, { username, role }>
+                    mediaMode: 'none', // 'none' | 'local' | 'youtube'
+                    currentVideoUrl: null,
+                    currentFileName: null,
+                    currentFileSize: 0,
+                    youtubeVideoId: null,
+                    youtubeTitle: null,
+                    ytPlayer: null,
+                    ytFallbackMode: false,
+                    ytProgressTimer: null,
+                    guestUsingLocalFile: false,
+                    activeMediaCall: null,
+                    syncInterval: null
+                };
 
-                        if (!res.ok) continue;
-                        const data = await res.json();
-                        const items = (Array.isArray(data) ? data : [])
-                            .filter(item => item.videoId)
-                            .map(item => ({
-                                videoId: item.videoId,
-                                title: item.title || 'Sem título',
-                                channel: item.author || 'Canal do YouTube',
-                                duration: item.lengthSeconds > 0 ? formatTime(item.lengthSeconds) : 'AO VIVO',
-                                views: item.viewCount,
-                                thumbnail: `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`
-                            }));
+                // Referências DOM - Lobby
+                const lobbyView = document.getElementById('lobby-view');
+                const roomView = document.getElementById('room-view');
+                const usernameInput = document.getElementById('username-input');
+                const btnCreateRoom = document.getElementById('btn-create-room');
+                const joinRoomForm = document.getElementById('join-room-form');
+                const roomCodeInput = document.getElementById('room-code-input');
 
-                        if (items.length > 0) {
-                            renderYouTubeResults(items.slice(0, 12), `Resultados para "${query}"`);
-                            return;
-                        }
-                    } catch (err) {
-                        // Continua para a próxima instância
+                // Referências DOM - Room Header
+                const displayRoomCode = document.getElementById('display-room-code');
+                const btnCopyCode = document.getElementById('btn-copy-code');
+                const roleBadge = document.getElementById('role-badge');
+                const networkStatusPill = document.getElementById('network-status-pill');
+                const networkDot = document.getElementById('network-dot');
+                const networkStatusText = document.getElementById('network-status-text');
+                const viewersPill = document.getElementById('viewers-pill');
+                const viewerCountEl = document.getElementById('viewer-count');
+                const btnForceSync = document.getElementById('btn-force-sync');
+                const btnReconnect = document.getElementById('btn-reconnect');
+                const btnLeaveRoom = document.getElementById('btn-leave-room');
+
+                // Referências DOM - Upload & YouTube Search
+                const hostUploadPanel = document.getElementById('host-upload-panel');
+                const ytSearchForm = document.getElementById('yt-search-form');
+                const ytSearchInput = document.getElementById('yt-search-input');
+                const btnClearYtSearch = document.getElementById('btn-clear-yt-search');
+                const ytResultsDrawer = document.getElementById('yt-results-drawer');
+                const ytResultsTitle = document.getElementById('yt-results-title');
+                const ytResultsGrid = document.getElementById('yt-results-grid');
+                const btnCloseYtResults = document.getElementById('btn-close-yt-results');
+
+                const guestStatusBanner = document.getElementById('guest-status-banner');
+                const guestBannerIcon = document.getElementById('guest-banner-icon');
+                const guestBannerText = document.getElementById('guest-banner-text');
+                const guestFileBadge = document.getElementById('guest-file-badge');
+                const guestLocalUploadWrapper = document.getElementById('guest-local-upload-wrapper');
+                const guestLocalFileInput = document.getElementById('guest-local-file-input');
+                const guestLocalLabel = document.getElementById('guest-local-label');
+                const videoFileInput = document.getElementById('video-file-input');
+                const uploadBtnLabel = document.getElementById('upload-btn-label');
+                const fileInfoText = document.getElementById('file-info-text');
+
+                const videoPlaceholder = document.getElementById('video-placeholder');
+                const placeholderTitle = document.getElementById('placeholder-title');
+                const placeholderSubtitle = document.getElementById('placeholder-subtitle');
+                const videoEl = document.getElementById('cinema-video');
+                const youtubeStage = document.getElementById('youtube-stage');
+                const ytClickShield = document.getElementById('yt-click-shield');
+                const videoSyncPill = document.getElementById('video-sync-pill');
+                const videoSyncDot = document.getElementById('video-sync-dot');
+                const videoSyncText = document.getElementById('video-sync-text');
+                const customControls = document.getElementById('custom-controls');
+
+                // Controles do Player
+                const btnPlayPause = document.getElementById('btn-play-pause');
+                const iconPlay = document.getElementById('icon-play');
+                const iconPause = document.getElementById('icon-pause');
+                const btnRewind = document.getElementById('btn-rewind');
+                const btnForward = document.getElementById('btn-forward');
+                const seekBar = document.getElementById('seek-bar');
+                const timeCurrent = document.getElementById('time-current');
+                const timeDuration = document.getElementById('time-duration');
+                const btnMute = document.getElementById('btn-mute');
+                const iconVolHigh = document.getElementById('icon-vol-high');
+                const iconVolMute = document.getElementById('icon-vol-mute');
+                const volumeBar = document.getElementById('volume-bar');
+                const btnFullscreen = document.getElementById('btn-fullscreen');
+                const lockedControlsHint = document.getElementById('locked-controls-hint');
+
+                // Metadados do Arquivo
+                const activeMediaFooter = document.getElementById('active-media-footer');
+                const activeFileName = document.getElementById('active-file-name');
+                const activeFileSize = document.getElementById('active-file-size');
+                const syncModeText = document.getElementById('sync-mode-text');
+
+                // Chat
+                const chatMessages = document.getElementById('chat-messages');
+                const chatForm = document.getElementById('chat-form');
+                const chatInput = document.getElementById('chat-input');
+                const chatStatusBadge = document.getElementById('chat-status-badge');
+
+                // ==========================================
+                // FUNÇÕES UTILITÁRIAS
+                // ==========================================
+
+                function generateRoomCode() {
+                    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+                    let code = '';
+                    for (let i = 0; i < 6; i++) {
+                        code += chars.charAt(Math.floor(Math.random() * chars.length));
                     }
+                    return code;
                 }
 
-                // Caso todas as APIs públicas estejam temporariamente bloqueadas pela rede
-                ytResultsTitle.textContent = 'Busca indisponível no momento';
-                ytResultsGrid.innerHTML = `
-                    <div class="col-span-full p-4 bg-cinema-950 border border-cinema-800 rounded-xl text-center">
-                        <p class="text-xs text-gray-300 mb-1">Não foi possível consultar os servidores de busca agora.</p>
-                        <p class="text-[11px] text-gray-500">Dica: Você pode colar qualquer <strong>link do YouTube</strong> (ex: <span class="text-gray-400 font-mono">https://youtu.be/...</span>) diretamente na barra acima!</p>
-                    </div>
-                `;
-            }
+                function formatBytes(bytes) {
+                    if (!bytes || bytes === 0) return '0 Bytes';
+                    const k = 1024;
+                    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+                }
 
-            /**
-             * Renderiza o menu/grade de resultados do YouTube
-             */
-            function renderYouTubeResults(videos, headingText) {
-                ytResultsTitle.textContent = headingText;
-                ytResultsGrid.innerHTML = '';
+                function formatTime(seconds) {
+                    if (isNaN(seconds) || seconds < 0) return '00:00';
+                    const hrs = Math.floor(seconds / 3600);
+                    const mins = Math.floor((seconds % 3600) / 60);
+                    const secs = Math.floor(seconds % 60);
+                    if (hrs > 0) {
+                        return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                    }
+                    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                }
 
-                videos.forEach(video => {
-                    const card = document.createElement('button');
-                    card.type = 'button';
-                    card.className = 'group text-left bg-cinema-950 hover:bg-cinema-800/90 border border-cinema-800 hover:border-rose-500/60 rounded-xl p-2 flex gap-3 transition-all active:scale-[0.99]';
-                    
-                    const durationBadge = video.duration
-                        ? `<span class="absolute bottom-1 right-1 bg-black/85 text-white text-[10px] font-mono px-1.5 py-0.5 rounded">${escapeHtml(video.duration)}</span>`
-                        : '';
-                    const viewsText = video.views ? ` • ${formatViews(video.views)}` : '';
+                function showToast(title, message, type = 'info') {
+                    try {
+                        const container = document.getElementById('toast-container');
+                        if (!container) return;
+                        const toast = document.createElement('div');
+                        const colors = {
+                            info: 'border-cinema-700 bg-cinema-900 text-gray-100',
+                            success: 'border-emerald-500/50 bg-cinema-900 text-emerald-300',
+                            error: 'border-rose-500/60 bg-cinema-900 text-rose-300',
+                            warning: 'border-amber-500/50 bg-cinema-900 text-amber-300'
+                        };
+                        const icons = {
+                            info: 'info',
+                            success: 'check-circle-2',
+                            error: 'alert-triangle',
+                            warning: 'alert-circle'
+                        };
 
-                    card.innerHTML = `
-                        <div class="relative w-28 sm:w-32 aspect-video rounded-lg overflow-hidden bg-black shrink-0 border border-cinema-800">
-                            <img src="${video.thumbnail}" alt="${escapeHtml(video.title)}" onerror="this.src='https://placehold.co/320x180/161821/e11d48?text=YouTube'" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
-                            ${durationBadge}
-                        </div>
-                        <div class="flex-1 min-w-0 flex flex-col justify-between py-0.5">
-                            <h5 class="text-xs font-semibold text-gray-100 group-hover:text-rose-400 line-clamp-2 leading-snug transition-colors">${escapeHtml(video.title)}</h5>
-                            <div class="mt-1">
-                                <p class="text-[11px] text-gray-400 truncate">${escapeHtml(video.channel)}</p>
-                                <p class="text-[10px] text-gray-500 truncate">${escapeHtml(viewsText.replace(/^ • /, ''))}</p>
+                        toast.className = `pointer-events-auto border ${colors[type] || colors.info} rounded-2xl p-3.5 shadow-2xl flex items-start gap-3 transition-all duration-300 translate-y-0 opacity-100`;
+                        toast.innerHTML = `
+                            <i data-lucide="${icons[type] || 'info'}" class="w-5 h-5 shrink-0 mt-0.5"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="font-semibold text-xs sm:text-sm text-white">${escapeHtml(title)}</p>
+                                <p class="text-xs text-gray-300 mt-0.5 leading-relaxed">${escapeHtml(message)}</p>
                             </div>
-                        </div>
-                    `;
+                        `;
+                        container.appendChild(toast);
+                        refreshIcons(toast);
 
-                    card.addEventListener('click', () => {
-                        selectYouTubeVideo(video.videoId, video.title);
+                        setTimeout(() => {
+                            toast.classList.add('opacity-0', '-translate-y-2');
+                            setTimeout(() => toast.remove(), 300);
+                        }, 4500);
+                    } catch (e) {}
+                }
+
+                function escapeHtml(str) {
+                    if (str === null || str === undefined) return '';
+                    const div = document.createElement('div');
+                    div.textContent = String(str);
+                    return div.innerHTML;
+                }
+
+                function copyTextSafe(text) {
+                    try {
+                        const tempInput = document.createElement('input');
+                        tempInput.value = text;
+                        document.body.appendChild(tempInput);
+                        tempInput.select();
+                        tempInput.setSelectionRange(0, 99999);
+                        document.execCommand('copy');
+                        document.body.removeChild(tempInput);
+                        showToast('Código Copiado!', `Código "${text}" copiado para a área de transferência.`, 'success');
+                    } catch (err) {
+                        showToast('Código da Sala', `Compartilhe o código: ${text}`, 'info');
+                    }
+                }
+
+                function setNetworkStatus(status, text) {
+                    networkStatusPill.classList.remove('hidden');
+                    networkStatusText.textContent = text;
+                    networkDot.className = 'w-2 h-2 rounded-full';
+                    if (status === 'online') {
+                        networkDot.classList.add('bg-emerald-400');
+                        chatStatusBadge.textContent = 'Online';
+                        chatStatusBadge.className = 'text-[11px] text-emerald-400 bg-cinema-950 px-2 py-0.5 rounded-md border border-cinema-800';
+                    } else if (status === 'connecting') {
+                        networkDot.classList.add('bg-amber-400', 'animate-pulse');
+                        chatStatusBadge.textContent = 'Conectando...';
+                        chatStatusBadge.className = 'text-[11px] text-amber-400 bg-cinema-950 px-2 py-0.5 rounded-md border border-cinema-800';
+                    } else {
+                        networkDot.classList.add('bg-rose-500');
+                        chatStatusBadge.textContent = 'Offline';
+                        chatStatusBadge.className = 'text-[11px] text-rose-400 bg-cinema-950 px-2 py-0.5 rounded-md border border-cinema-800';
+                    }
+                }
+
+                function updateGuestBanner(mode, htmlText) {
+                    guestBannerText.innerHTML = htmlText;
+                    guestBannerIcon.className = 'w-4 h-4 shrink-0';
+                    if (mode === 'streaming') {
+                        guestBannerIcon.setAttribute('data-lucide', 'tv');
+                        guestBannerIcon.classList.add('text-emerald-400');
+                    } else if (mode === 'local') {
+                        guestBannerIcon.setAttribute('data-lucide', 'hard-drive');
+                        guestBannerIcon.classList.add('text-indigo-400');
+                    } else if (mode === 'error') {
+                        guestBannerIcon.setAttribute('data-lucide', 'wifi-off');
+                        guestBannerIcon.classList.add('text-rose-400');
+                    } else {
+                        guestBannerIcon.setAttribute('data-lucide', 'radio');
+                        guestBannerIcon.classList.add('text-amber-400', 'animate-pulse');
+                    }
+                    refreshIcons(guestStatusBanner);
+                }
+
+                function updateVideoSyncOverlay(mode, label) {
+                    videoSyncText.textContent = label;
+                    videoSyncDot.className = 'w-2 h-2 rounded-full';
+                    if (mode === 'synced') {
+                        videoSyncPill.className = 'absolute top-4 right-4 bg-black/75 backdrop-blur-md border border-emerald-500/30 px-3 py-1.5 rounded-full flex items-center gap-2 text-xs font-medium text-emerald-400 z-20 pointer-events-none';
+                        videoSyncDot.classList.add('bg-emerald-400', 'animate-ping');
+                    } else {
+                        videoSyncPill.className = 'absolute top-4 right-4 bg-black/75 backdrop-blur-md border border-amber-500/30 px-3 py-1.5 rounded-full flex items-center gap-2 text-xs font-medium text-amber-300 z-20 pointer-events-none';
+                        videoSyncDot.classList.add('bg-amber-400', 'animate-pulse');
+                    }
+                }
+
+                // ==========================================
+                // CAPTURA E STREAMING DE VÍDEO WEBRTC (HOST)
+                // ==========================================
+
+                function getHostVideoStream() {
+                    try {
+                        if (typeof videoEl.captureStream === 'function') {
+                            return videoEl.captureStream();
+                        }
+                        if (typeof videoEl.mozCaptureStream === 'function') {
+                            return videoEl.mozCaptureStream();
+                        }
+                    } catch (err) {
+                        // Captura restrita pelo navegador
+                    }
+                    return null;
+                }
+
+                function streamVideoToGuest(guestPeerId) {
+                    try {
+                        if (state.role !== 'host' || !state.peer || state.mediaMode !== 'local' || !state.currentVideoUrl) return;
+                        
+                        const stream = getHostVideoStream();
+                        if (!stream) {
+                            showToast('Aviso de Transmissão', 'Seu navegador restringiu a captura direta de stream. Os convidados podem usar o modo arquivo local.', 'warning');
+                            return;
+                        }
+
+                        const guestEntry = state.guestConnections.get(guestPeerId);
+                        if (guestEntry && guestEntry.call) {
+                            try { guestEntry.call.close(); } catch (e) {}
+                        }
+
+                        const call = state.peer.call(guestPeerId, stream, {
+                            metadata: {
+                                fileName: state.currentFileName,
+                                fileSize: state.currentFileSize
+                            }
+                        });
+
+                        if (guestEntry) {
+                            guestEntry.call = call;
+                        }
+                    } catch (e) {}
+                }
+
+                function streamVideoToAllGuests() {
+                    if (state.role !== 'host' || state.mediaMode !== 'local' || !state.currentVideoUrl) return;
+                    state.guestConnections.forEach((_, guestPeerId) => {
+                        streamVideoToGuest(guestPeerId);
+                    });
+                }
+
+                // ==========================================
+                // PESQUISA YOUTUBE & PLAYER SINCRONIZADO
+                // ==========================================
+
+                function extractYouTubeId(input) {
+                    if (!input) return null;
+                    const trimmed = input.trim();
+                    if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
+                        return trimmed;
+                    }
+                    const patterns = [
+                        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/|youtube\.com\/live\/)([a-zA-Z0-9_-]{11})/,
+                        /[?&]v=([a-zA-Z0-9_-]{11})/
+                    ];
+                    for (const regex of patterns) {
+                        const match = trimmed.match(regex);
+                        if (match && match[1]) return match[1];
+                    }
+                    return null;
+                }
+
+                function formatViews(views) {
+                    if (!views || isNaN(views)) return '';
+                    if (views >= 1000000) return (views / 1000000).toFixed(1).replace('.0', '') + ' mi de visualizações';
+                    if (views >= 1000) return Math.floor(views / 1000) + ' mil visualizações';
+                    return views + ' visualizações';
+                }
+
+                async function searchYouTubeVideos(query) {
+                    try {
+                        const directId = extractYouTubeId(query);
+                        ytResultsDrawer.classList.remove('hidden');
+                        ytResultsTitle.textContent = `Buscando "${query}" no YouTube...`;
+                        ytResultsGrid.innerHTML = `
+                            <div class="col-span-full py-8 flex flex-col items-center justify-center text-gray-400 gap-2">
+                                <i data-lucide="loader-2" class="w-6 h-6 text-rose-500 animate-spin"></i>
+                                <span class="text-xs">Pesquisando vídeos relacionados...</span>
+                            </div>
+                        `;
+                        refreshIcons(ytResultsGrid);
+
+                        if (directId) {
+                            renderYouTubeResults([{
+                                videoId: directId,
+                                title: `Vídeo do YouTube (${directId})`,
+                                channel: 'Link Direto do YouTube',
+                                duration: null,
+                                views: null,
+                                thumbnail: `https://i.ytimg.com/vi/${directId}/hqdefault.jpg`
+                            }], `Vídeo encontrado pelo link`);
+                            return;
+                        }
+
+                        // 1. Tenta instâncias Piped API
+                        for (const baseUrl of PIPED_INSTANCES) {
+                            try {
+                                const controller = new AbortController();
+                                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                                const res = await fetch(`${baseUrl}/search?q=${encodeURIComponent(query)}&filter=videos`, {
+                                    signal: controller.signal
+                                });
+                                clearTimeout(timeoutId);
+
+                                if (!res.ok) continue;
+                                const data = await res.json();
+                                const items = (data.items || [])
+                                    .filter(item => item.type === 'stream' && item.url)
+                                    .map(item => {
+                                        const vid = extractYouTubeId(item.url);
+                                        return {
+                                            videoId: vid,
+                                            title: item.title || 'Sem título',
+                                            channel: item.uploaderName || 'Canal do YouTube',
+                                            duration: item.duration > 0 ? formatTime(item.duration) : 'AO VIVO',
+                                            views: item.views,
+                                            thumbnail: item.thumbnail || (vid ? `https://i.ytimg.com/vi/${vid}/hqdefault.jpg` : '')
+                                        };
+                                    })
+                                    .filter(v => v.videoId);
+
+                                if (items.length > 0) {
+                                    renderYouTubeResults(items.slice(0, 12), `Resultados para "${query}"`);
+                                    return;
+                                }
+                            } catch (err) {}
+                        }
+
+                        // 2. Fallback para instâncias Invidious API
+                        for (const baseUrl of INVIDIOUS_INSTANCES) {
+                            try {
+                                const controller = new AbortController();
+                                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                                const res = await fetch(`${baseUrl}/api/v1/search?q=${encodeURIComponent(query)}&type=video`, {
+                                    signal: controller.signal
+                                });
+                                clearTimeout(timeoutId);
+
+                                if (!res.ok) continue;
+                                const data = await res.json();
+                                const items = (Array.isArray(data) ? data : [])
+                                    .filter(item => item.videoId)
+                                    .map(item => ({
+                                        videoId: item.videoId,
+                                        title: item.title || 'Sem título',
+                                        channel: item.author || 'Canal do YouTube',
+                                        duration: item.lengthSeconds > 0 ? formatTime(item.lengthSeconds) : 'AO VIVO',
+                                        views: item.viewCount,
+                                        thumbnail: `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`
+                                    }));
+
+                                if (items.length > 0) {
+                                    renderYouTubeResults(items.slice(0, 12), `Resultados para "${query}"`);
+                                    return;
+                                }
+                            } catch (err) {}
+                        }
+
+                        ytResultsTitle.textContent = 'Busca indisponível no momento';
+                        ytResultsGrid.innerHTML = `
+                            <div class="col-span-full p-4 bg-cinema-950 border border-cinema-800 rounded-xl text-center">
+                                <p class="text-xs text-gray-300 mb-1">Não foi possível consultar os servidores de busca agora.</p>
+                                <p class="text-[11px] text-gray-500">Dica: Cole qualquer <strong>link do YouTube</strong> (ex: <span class="text-gray-400 font-mono">https://youtu.be/...</span>) diretamente na barra acima!</p>
+                            </div>
+                        `;
+                    } catch (e) {}
+                }
+
+                function renderYouTubeResults(videos, headingText) {
+                    ytResultsTitle.textContent = headingText;
+                    ytResultsGrid.innerHTML = '';
+
+                    videos.forEach(video => {
+                        const card = document.createElement('button');
+                        card.type = 'button';
+                        card.className = 'group text-left bg-cinema-950 hover:bg-cinema-800/90 border border-cinema-800 hover:border-rose-500/60 rounded-xl p-2 flex gap-3 transition-all active:scale-[0.99]';
+                        
+                        const durationBadge = video.duration
+                            ? `<span class="absolute bottom-1 right-1 bg-black/85 text-white text-[10px] font-mono px-1.5 py-0.5 rounded">${escapeHtml(video.duration)}</span>`
+                            : '';
+                        const viewsText = video.views ? ` • ${formatViews(video.views)}` : '';
+
+                        card.innerHTML = `
+                            <div class="relative w-28 sm:w-32 aspect-video rounded-lg overflow-hidden bg-black shrink-0 border border-cinema-800">
+                                <img src="${video.thumbnail}" alt="${escapeHtml(video.title)}" onerror="this.src='https://placehold.co/320x180/161821/e11d48?text=YouTube'" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+                                ${durationBadge}
+                            </div>
+                            <div class="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+                                <h5 class="text-xs font-semibold text-gray-100 group-hover:text-rose-400 line-clamp-2 leading-snug transition-colors">${escapeHtml(video.title)}</h5>
+                                <div class="mt-1">
+                                    <p class="text-[11px] text-gray-400 truncate">${escapeHtml(video.channel)}</p>
+                                    <p class="text-[10px] text-gray-500 truncate">${escapeHtml(viewsText.replace(/^ • /, ''))}</p>
+                                </div>
+                            </div>
+                        `;
+
+                        card.addEventListener('click', () => {
+                            selectYouTubeVideo(video.videoId, video.title);
+                        });
+
+                        ytResultsGrid.appendChild(card);
+                    });
+                }
+
+                function selectYouTubeVideo(videoId, title) {
+                    if (state.role !== 'host') return;
+
+                    if (state.currentVideoUrl) {
+                        try { URL.revokeObjectURL(state.currentVideoUrl); } catch (e) {}
+                        state.currentVideoUrl = null;
+                    }
+                    state.guestConnections.forEach((entry) => {
+                        if (entry.call) {
+                            try { entry.call.close(); } catch (e) {}
+                            entry.call = null;
+                        }
                     });
 
-                    ytResultsGrid.appendChild(card);
-                });
-            }
+                    state.mediaMode = 'youtube';
+                    state.youtubeVideoId = videoId;
+                    state.youtubeTitle = title || `YouTube (${videoId})`;
+                    state.currentFileName = state.youtubeTitle;
+                    state.currentFileSize = 0;
 
-            /**
-             * Seleciona e inicia um vídeo do YouTube para o Host e transmite o comando para todos os Convidados
-             */
-            function selectYouTubeVideo(videoId, title) {
-                if (state.role !== 'host') return;
+                    ytResultsDrawer.classList.add('hidden');
+                    fileInfoText.innerHTML = `YouTube ativo: <strong class="text-rose-400">${escapeHtml(state.youtubeTitle)}</strong>`;
 
-                // Encerra eventual stream local anterior
-                if (state.currentVideoUrl) {
-                    URL.revokeObjectURL(state.currentVideoUrl);
-                    state.currentVideoUrl = null;
-                }
-                state.guestConnections.forEach((entry) => {
-                    if (entry.call) {
-                        try { entry.call.close(); } catch (e) {}
-                        entry.call = null;
-                    }
-                });
+                    loadYouTubeIntoPlayer(videoId, state.youtubeTitle, 0, true);
 
-                state.mediaMode = 'youtube';
-                state.youtubeVideoId = videoId;
-                state.youtubeTitle = title || `YouTube (${videoId})`;
-                state.currentFileName = state.youtubeTitle;
-                state.currentFileSize = 0;
+                    broadcastToGuests({
+                        type: 'LOAD_YOUTUBE',
+                        videoId: videoId,
+                        title: state.youtubeTitle,
+                        currentTime: 0,
+                        autoplay: true
+                    });
 
-                ytResultsDrawer.classList.add('hidden');
-                fileInfoText.innerHTML = `YouTube ativo: <strong class="text-rose-400">${escapeHtml(state.youtubeTitle)}</strong>`;
-
-                loadYouTubeIntoPlayer(videoId, state.youtubeTitle, 0, true);
-
-                // Sincroniza com todos os convidados da sala
-                broadcastToGuests({
-                    type: 'LOAD_YOUTUBE',
-                    videoId: videoId,
-                    title: state.youtubeTitle,
-                    currentTime: 0,
-                    autoplay: true
-                });
-
-                addSystemMessage(`Você iniciou o vídeo do YouTube: "${state.youtubeTitle}".`);
-                showToast('YouTube Carregado!', 'O vídeo foi iniciado para você e todos os convidados da sala.', 'success');
-            }
-
-            /**
-             * Monta ou atualiza o YouTube IFrame Player sincronizado no palco
-             */
-            function loadYouTubeIntoPlayer(videoId, title, startSeconds = 0, autoplay = true) {
-                // Oculta player HTML5 local e placeholder
-                videoEl.pause();
-                videoEl.srcObject = null;
-                videoEl.removeAttribute('src');
-                videoEl.classList.add('hidden');
-                videoPlaceholder.classList.add('hidden');
-
-                // Exibe palco do YouTube e controles customizados sincronizados
-                youtubeStage.classList.remove('hidden');
-                customControls.classList.remove('hidden');
-                activeMediaFooter.classList.remove('hidden');
-
-                activeFileName.textContent = title || `YouTube (${videoId})`;
-                activeFileSize.textContent = 'YouTube HD';
-                syncModeText.textContent = state.role === 'host' ? 'YouTube Sincronizado (Host)' : 'YouTube Sincronizado com o Host';
-
-                if (state.role === 'guest') {
-                    guestFileBadge.textContent = title || 'YouTube';
-                    guestFileBadge.classList.remove('hidden');
-                    guestLocalUploadWrapper.classList.add('hidden');
-                    updateGuestBanner('streaming', `Assistindo vídeo do YouTube sincronizado com o <strong>Host</strong>.`);
-                    updateVideoSyncOverlay('synced', 'Sincronizado com o Host');
+                    addSystemMessage(`Você iniciou o vídeo do YouTube: "${state.youtubeTitle}".`);
+                    showToast('YouTube Carregado!', 'O vídeo foi iniciado para você e todos os convidados da sala.', 'success');
                 }
 
-                const initOrLoad = () => {
-                    if (state.ytPlayer && typeof state.ytPlayer.loadVideoById === 'function') {
-                        if (autoplay) {
-                            state.ytPlayer.loadVideoById({ videoId, startSeconds });
-                            updatePlayPauseUI(false);
-                        } else {
-                            state.ytPlayer.cueVideoById({ videoId, startSeconds });
-                            updatePlayPauseUI(true);
+                /**
+                 * Monta ou atualiza o YouTube IFrame Player com fallback seguro para iframes/sandboxes
+                 */
+                function loadYouTubeIntoPlayer(videoId, title, startSeconds = 0, autoplay = true) {
+                    try {
+                        videoEl.pause();
+                        videoEl.srcObject = null;
+                        videoEl.removeAttribute('src');
+                        videoEl.classList.add('hidden');
+                        videoPlaceholder.classList.add('hidden');
+
+                        youtubeStage.classList.remove('hidden');
+                        customControls.classList.remove('hidden');
+                        activeMediaFooter.classList.remove('hidden');
+
+                        activeFileName.textContent = title || `YouTube (${videoId})`;
+                        activeFileSize.textContent = 'YouTube HD';
+                        syncModeText.textContent = state.role === 'host' ? 'YouTube Sincronizado (Host)' : 'YouTube Sincronizado com o Host';
+
+                        if (state.role === 'guest') {
+                            guestFileBadge.textContent = title || 'YouTube';
+                            guestFileBadge.classList.remove('hidden');
+                            guestLocalUploadWrapper.classList.add('hidden');
+                            updateGuestBanner('streaming', `Assistindo vídeo do YouTube sincronizado com o <strong>Host</strong>.`);
+                            updateVideoSyncOverlay('synced', 'Sincronizado com o Host');
                         }
+
+                        // Fallback direto por iframe caso YT.Player não esteja disponível (ex: sandbox sem API externa)
+                        const mountFallbackIframe = () => {
+                            state.ytFallbackMode = true;
+                            const startParam = Math.floor(startSeconds);
+                            const autoParam = autoplay ? 1 : 0;
+                            youtubeStage.innerHTML = `
+                                <iframe id="yt-fallback-iframe"
+                                    src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?autoplay=${autoParam}&start=${startParam}&enablejsapi=1&rel=0&modestbranding=1"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                    allowfullscreen></iframe>
+                            `;
+                            updatePlayPauseUI(!autoplay);
+                        };
+
+                        const initOrLoad = () => {
+                            try {
+                                if (state.ytPlayer && typeof state.ytPlayer.loadVideoById === 'function') {
+                                    state.ytFallbackMode = false;
+                                    if (autoplay) {
+                                        state.ytPlayer.loadVideoById({ videoId, startSeconds });
+                                        updatePlayPauseUI(false);
+                                    } else {
+                                        state.ytPlayer.cueVideoById({ videoId, startSeconds });
+                                        updatePlayPauseUI(true);
+                                    }
+                                    return;
+                                }
+
+                                youtubeStage.innerHTML = `
+                                    <div id="yt-player-mount" class="w-full h-full"></div>
+                                    <div id="yt-click-shield" class="absolute inset-0 z-10 cursor-pointer"></div>
+                                `;
+                                const shield = document.getElementById('yt-click-shield');
+                                if (shield) {
+                                    shield.addEventListener('click', () => {
+                                        if (state.role === 'host') btnPlayPause.click();
+                                    });
+                                }
+
+                                // Só passa origin quando protocolo http/https com hostname válido (evita erro em file:// ou srcdoc)
+                                const playerVars = {
+                                    autoplay: autoplay ? 1 : 0,
+                                    controls: 0,
+                                    disablekb: 1,
+                                    modestbranding: 1,
+                                    rel: 0,
+                                    playsinline: 1,
+                                    start: Math.floor(startSeconds)
+                                };
+                                if (window.location && window.location.protocol && window.location.protocol.startsWith('http') && window.location.hostname) {
+                                    playerVars.origin = window.location.origin;
+                                }
+
+                                state.ytFallbackMode = false;
+                                state.ytPlayer = new window.YT.Player('yt-player-mount', {
+                                    width: '100%',
+                                    height: '100%',
+                                    videoId: videoId,
+                                    playerVars: playerVars,
+                                    events: {
+                                        onReady: (event) => {
+                                            try {
+                                                const vol = Math.round(parseFloat(volumeBar.value) * 100);
+                                                event.target.setVolume(vol);
+                                                if (autoplay) {
+                                                    event.target.playVideo();
+                                                    updatePlayPauseUI(false);
+                                                }
+                                                startYouTubeProgressTracker();
+                                            } catch (e) {}
+                                        },
+                                        onStateChange: (event) => {
+                                            if (event.data === 1) {
+                                                updatePlayPauseUI(false);
+                                                const dur = state.ytPlayer && state.ytPlayer.getDuration ? state.ytPlayer.getDuration() : 0;
+                                                if (dur > 0) timeDuration.textContent = formatTime(dur);
+                                            } else if (event.data === 2) {
+                                                updatePlayPauseUI(true);
+                                            } else if (event.data === 0) {
+                                                updatePlayPauseUI(true);
+                                                if (state.role === 'host') {
+                                                    broadcastToGuests({ type: 'VIDEO_PAUSE', currentTime: (state.ytPlayer && state.ytPlayer.getDuration ? state.ytPlayer.getDuration() : 0) });
+                                                }
+                                            }
+                                        },
+                                        onError: () => {
+                                            mountFallbackIframe();
+                                        }
+                                    }
+                                });
+                            } catch (e) {
+                                mountFallbackIframe();
+                            }
+                        };
+
+                        if (window.CineSyncExternal.ytApiReady && typeof window.YT !== 'undefined' && window.YT.Player) {
+                            initOrLoad();
+                        } else if (window.CineSyncExternal.ytApiError) {
+                            mountFallbackIframe();
+                        } else {
+                            let attempts = 0;
+                            const waitYt = setInterval(() => {
+                                attempts++;
+                                if (window.CineSyncExternal.ytApiReady && typeof window.YT !== 'undefined' && window.YT.Player) {
+                                    clearInterval(waitYt);
+                                    initOrLoad();
+                                } else if (window.CineSyncExternal.ytApiError || attempts >= 20) {
+                                    clearInterval(waitYt);
+                                    mountFallbackIframe();
+                                }
+                            }, 200);
+                        }
+                    } catch (e) {}
+                }
+
+                function startYouTubeProgressTracker() {
+                    if (state.ytProgressTimer) clearInterval(state.ytProgressTimer);
+                    state.ytProgressTimer = setInterval(() => {
+                        try {
+                            if (state.mediaMode !== 'youtube' || state.ytFallbackMode || !state.ytPlayer || typeof state.ytPlayer.getCurrentTime !== 'function') return;
+                            const curr = state.ytPlayer.getCurrentTime() || 0;
+                            const dur = state.ytPlayer.getDuration() || 0;
+                            if (dur > 0) {
+                                seekBar.value = (curr / dur) * 100;
+                                timeCurrent.textContent = formatTime(curr);
+                                timeDuration.textContent = formatTime(dur);
+                            }
+                        } catch (e) {}
+                    }, 400);
+                }
+
+                function destroyYouTubePlayer() {
+                    if (state.ytProgressTimer) {
+                        clearInterval(state.ytProgressTimer);
+                        state.ytProgressTimer = null;
+                    }
+                    if (state.ytPlayer && typeof state.ytPlayer.destroy === 'function') {
+                        try { state.ytPlayer.destroy(); } catch (e) {}
+                    }
+                    state.ytPlayer = null;
+                    state.ytFallbackMode = false;
+                    youtubeStage.innerHTML = '';
+                    youtubeStage.classList.add('hidden');
+                }
+
+                // ==========================================================
+                // GERENCIAMENTO DE SALA & PEERJS + FALLBACK BROADCASTCHANNEL
+                // ==========================================================
+
+                function setupLocalBroadcastFallback(roomCode) {
+                    try {
+                        if (typeof BroadcastChannel === 'undefined') return;
+                        if (state.broadcastChannel) {
+                            try { state.broadcastChannel.close(); } catch (e) {}
+                        }
+                        const bc = new BroadcastChannel('cinesync_local_' + roomCode);
+                        state.broadcastChannel = bc;
+
+                        bc.onmessage = (event) => {
+                            const msg = event.data;
+                            if (!msg || !msg.payload) return;
+                            if (state.role === 'host' && msg.target === 'host') {
+                                const fakeConn = {
+                                    peer: msg.senderId || 'local-tab-guest',
+                                    send: (reply) => {
+                                        bc.postMessage({ target: 'guest', targetId: fakeConn.peer, payload: reply });
+                                    }
+                                };
+                                handleHostReceiveData(fakeConn, msg.payload);
+                            } else if (state.role === 'guest' && msg.target === 'guest') {
+                                if (!msg.targetId || msg.targetId === state.localTabId) {
+                                    handleGuestReceiveData(msg.payload);
+                                }
+                            }
+                        };
+                    } catch (e) {}
+                }
+
+                function enterRoom(code, role) {
+                    try {
+                        const rawName = usernameInput.value.trim();
+                        state.username = rawName || (role === 'host' ? 'Anfitrião' : 'Convidado_' + Math.floor(Math.random() * 900 + 100));
+                        state.roomCode = code.toUpperCase();
+                        state.role = role;
+                        state.mediaMode = 'none';
+                        state.guestConnections.clear();
+                        state.participants.clear();
+                        state.guestUsingLocalFile = false;
+                        state.localTabId = 'tab-' + Math.random().toString(36).slice(2, 9);
+
+                        // Alterna telas imediatamente
+                        lobbyView.classList.add('hidden');
+                        roomView.classList.remove('hidden');
+
+                        // Atualiza UI do Header
+                        displayRoomCode.textContent = state.roomCode;
+                        setNetworkStatus('connecting', 'Conectando à sala...');
+
+                        setupLocalBroadcastFallback(state.roomCode);
+
+                        if (role === 'host') {
+                            roleBadge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/15 border border-rose-500/30 text-rose-400';
+                            roleBadge.innerHTML = `<i data-lucide="crown" class="w-3.5 h-3.5"></i> Host (Anfitrião)`;
+                            
+                            hostUploadPanel.classList.remove('hidden');
+                            guestStatusBanner.classList.add('hidden');
+                            videoSyncPill.classList.add('hidden');
+                            btnForceSync.classList.remove('hidden');
+                            btnForceSync.classList.add('inline-flex');
+                            btnReconnect.classList.add('hidden');
+
+                            btnPlayPause.disabled = false;
+                            btnRewind.disabled = false;
+                            btnForward.disabled = false;
+                            seekBar.disabled = false;
+                            lockedControlsHint.classList.add('hidden');
+
+                            placeholderTitle.textContent = 'Sua sala está pronta!';
+                            placeholderSubtitle.textContent = 'Pesquise um vídeo no YouTube ou importe um arquivo local (até 5 GB) acima para iniciar.';
+                            
+                            waitForPeerAndStart('host');
+                        } else {
+                            roleBadge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/15 border border-indigo-500/30 text-indigo-300';
+                            roleBadge.innerHTML = `<i data-lucide="eye" class="w-3.5 h-3.5"></i> Convidado`;
+                            
+                            hostUploadPanel.classList.add('hidden');
+                            guestStatusBanner.classList.remove('hidden');
+                            guestLocalUploadWrapper.classList.remove('hidden');
+                            videoSyncPill.classList.remove('hidden');
+                            btnForceSync.classList.add('hidden');
+                            btnReconnect.classList.add('hidden');
+
+                            btnPlayPause.disabled = true;
+                            btnRewind.disabled = true;
+                            btnForward.disabled = true;
+                            seekBar.disabled = true;
+                            lockedControlsHint.classList.remove('hidden');
+                            lockedControlsHint.classList.add('inline-flex');
+
+                            updateGuestBanner('connecting', `Conectando ao Host da sala <strong>${state.roomCode}</strong>...`);
+                            updateVideoSyncOverlay('waiting', 'Conectando ao Host...');
+                            placeholderTitle.textContent = 'Conectando à sala do Host...';
+                            placeholderSubtitle.textContent = 'Aguarde alguns segundos enquanto estabelecemos a conexão.';
+
+                            waitForPeerAndStart('guest');
+                        }
+
+                        refreshIcons();
+                    } catch (err) {
+                        showToast('Erro ao Abrir Sala', 'Ocorreu um erro inesperado ao iniciar a sala.', 'error');
+                    }
+                }
+
+                function waitForPeerAndStart(role) {
+                    if (typeof window.Peer !== 'undefined') {
+                        if (role === 'host') initHostPeer();
+                        else initGuestPeer();
                         return;
                     }
 
-                    // Recria o container interno para o YT.Player substituir pelo iframe
-                    youtubeStage.innerHTML = `
-                        <div id="yt-player-mount" class="w-full h-full"></div>
-                        <div id="yt-click-shield" class="absolute inset-0 z-10 cursor-pointer"></div>
-                    `;
-                    document.getElementById('yt-click-shield').addEventListener('click', () => {
-                        if (state.role === 'host') {
-                            btnPlayPause.click();
-                        }
-                    });
-
-                    state.ytPlayer = new YT.Player('yt-player-mount', {
-                        width: '100%',
-                        height: '100%',
-                        videoId: videoId,
-                        playerVars: {
-                            autoplay: autoplay ? 1 : 0,
-                            controls: 0,
-                            disablekb: 1,
-                            modestbranding: 1,
-                            rel: 0,
-                            playsinline: 1,
-                            start: Math.floor(startSeconds),
-                            origin: window.location.origin
-                        },
-                        events: {
-                            onReady: (event) => {
-                                const vol = Math.round(parseFloat(volumeBar.value) * 100);
-                                event.target.setVolume(vol);
-                                if (autoplay) {
-                                    event.target.playVideo();
-                                    updatePlayPauseUI(false);
-                                }
-                                startYouTubeProgressTracker();
-                            },
-                            onStateChange: (event) => {
-                                // YT.PlayerState: PLAYING = 1, PAUSED = 2, ENDED = 0
-                                if (event.data === 1) {
-                                    updatePlayPauseUI(false);
-                                    const dur = state.ytPlayer.getDuration ? state.ytPlayer.getDuration() : 0;
-                                    if (dur > 0) timeDuration.textContent = formatTime(dur);
-                                } else if (event.data === 2) {
-                                    updatePlayPauseUI(true);
-                                } else if (event.data === 0) {
-                                    updatePlayPauseUI(true);
-                                    if (state.role === 'host') {
-                                        broadcastToGuests({ type: 'VIDEO_PAUSE', currentTime: state.ytPlayer.getDuration() || 0 });
-                                    }
+                    let checks = 0;
+                    const timer = setInterval(() => {
+                        checks++;
+                        if (typeof window.Peer !== 'undefined') {
+                            clearInterval(timer);
+                            if (role === 'host') initHostPeer();
+                            else initGuestPeer();
+                        } else if (window.CineSyncExternal.peerError || checks >= 25) {
+                            clearInterval(timer);
+                            // Modo local entre abas caso o CDN PeerJS esteja indisponível
+                            setNetworkStatus('online', 'Modo Local (Abas)');
+                            if (role === 'host') {
+                                state.participants.set('host', { username: state.username, role: 'host' });
+                                updateParticipantsUI();
+                                addSystemMessage(`Sala ${state.roomCode} ativa em modo local. Compartilhe o código!`);
+                            } else {
+                                updateGuestBanner('connected', `Conectado à sala local <strong>${state.roomCode}</strong>.`);
+                                updateVideoSyncOverlay('synced', 'Sincronizado (Modo Local)');
+                                if (state.broadcastChannel) {
+                                    state.broadcastChannel.postMessage({
+                                        target: 'host',
+                                        senderId: state.localTabId,
+                                        payload: { type: 'JOIN', username: state.username }
+                                    });
                                 }
                             }
-                        }
-                    });
-                };
-
-                if (window.ytApiReady && typeof YT !== 'undefined' && YT.Player) {
-                    initOrLoad();
-                } else {
-                    const waitYt = setInterval(() => {
-                        if (window.ytApiReady && typeof YT !== 'undefined' && YT.Player) {
-                            clearInterval(waitYt);
-                            initOrLoad();
                         }
                     }, 200);
                 }
-            }
 
-            /**
-             * Atualiza continuamente a barra de tempo enquanto o player do YouTube está ativo
-             */
-            function startYouTubeProgressTracker() {
-                if (state.ytProgressTimer) clearInterval(state.ytProgressTimer);
-                state.ytProgressTimer = setInterval(() => {
-                    if (state.mediaMode !== 'youtube' || !state.ytPlayer || typeof state.ytPlayer.getCurrentTime !== 'function') return;
-                    const curr = state.ytPlayer.getCurrentTime() || 0;
-                    const dur = state.ytPlayer.getDuration() || 0;
-                    if (dur > 0) {
-                        seekBar.value = (curr / dur) * 100;
-                        timeCurrent.textContent = formatTime(curr);
-                        timeDuration.textContent = formatTime(dur);
-                    }
-                }, 400);
-            }
+                function initHostPeer() {
+                    try {
+                        const hostPeerId = PEER_PREFIX + state.roomCode;
+                        const peer = new window.Peer(hostPeerId, PEER_CONFIG);
+                        state.peer = peer;
 
-            function destroyYouTubePlayer() {
-                if (state.ytProgressTimer) {
-                    clearInterval(state.ytProgressTimer);
-                    state.ytProgressTimer = null;
-                }
-                if (state.ytPlayer && typeof state.ytPlayer.destroy === 'function') {
-                    try { state.ytPlayer.destroy(); } catch (e) {}
-                }
-                state.ytPlayer = null;
-                youtubeStage.classList.add('hidden');
-            }
-
-            // ==========================================
-            // GERENCIAMENTO DE SALA & PEERJS (HOST / GUEST)
-            // ==========================================
-
-            function enterRoom(code, role) {
-                if (typeof Peer === 'undefined') {
-                    showToast('Erro de Rede', 'A biblioteca PeerJS não pôde ser carregada. Verifique sua conexão com a internet.', 'error');
-                    return;
-                }
-
-                const rawName = usernameInput.value.trim();
-                state.username = rawName || (role === 'host' ? 'Anfitrião' : 'Convidado_' + Math.floor(Math.random() * 900 + 100));
-                state.roomCode = code.toUpperCase();
-                state.role = role;
-                state.mediaMode = 'none';
-                state.guestConnections.clear();
-                state.participants.clear();
-                state.guestUsingLocalFile = false;
-
-                // Alterna telas
-                lobbyView.classList.add('hidden');
-                roomView.classList.remove('hidden');
-
-                // Atualiza UI do Header
-                displayRoomCode.textContent = state.roomCode;
-                setNetworkStatus('connecting', 'Conectando à rede P2P...');
-
-                if (role === 'host') {
-                    roleBadge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/15 border border-rose-500/30 text-rose-400';
-                    roleBadge.innerHTML = `<i data-lucide="crown" class="w-3.5 h-3.5"></i> Host (Anfitrião)`;
-                    
-                    hostUploadPanel.classList.remove('hidden');
-                    guestStatusBanner.classList.add('hidden');
-                    videoSyncPill.classList.add('hidden');
-                    btnForceSync.classList.remove('hidden');
-                    btnForceSync.classList.add('inline-flex');
-                    btnReconnect.classList.add('hidden');
-
-                    // Habilita controles de reprodução do Host
-                    btnPlayPause.disabled = false;
-                    btnRewind.disabled = false;
-                    btnForward.disabled = false;
-                    seekBar.disabled = false;
-                    lockedControlsHint.classList.add('hidden');
-
-                    placeholderTitle.textContent = 'Sua sala está pronta!';
-                    placeholderSubtitle.textContent = 'Pesquise um vídeo no YouTube ou importe um arquivo local (até 5 GB) acima para iniciar.';
-                    
-                    initHostPeer();
-                } else {
-                    roleBadge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/15 border border-indigo-500/30 text-indigo-300';
-                    roleBadge.innerHTML = `<i data-lucide="eye" class="w-3.5 h-3.5"></i> Convidado`;
-                    
-                    hostUploadPanel.classList.add('hidden');
-                    guestStatusBanner.classList.remove('hidden');
-                    guestLocalUploadWrapper.classList.remove('hidden');
-                    videoSyncPill.classList.remove('hidden');
-                    btnForceSync.classList.add('hidden');
-                    btnReconnect.classList.add('hidden');
-
-                    // Bloqueia controles de reprodução para o Convidado
-                    btnPlayPause.disabled = true;
-                    btnRewind.disabled = true;
-                    btnForward.disabled = true;
-                    seekBar.disabled = true;
-                    lockedControlsHint.classList.remove('hidden');
-                    lockedControlsHint.classList.add('inline-flex');
-
-                    updateGuestBanner('connecting', `Conectando ao Host da sala <strong>${state.roomCode}</strong>...`);
-                    updateVideoSyncOverlay('waiting', 'Conectando ao Host...');
-                    placeholderTitle.textContent = 'Conectando à sala do Host...';
-                    placeholderSubtitle.textContent = 'Aguarde alguns segundos enquanto estabelecemos a conexão direta P2P.';
-
-                    initGuestPeer();
-                }
-
-                lucide.createIcons();
-            }
-
-            /**
-             * Inicializa o nó PeerJS do HOST com ID determinístico baseado no código da sala
-             */
-            function initHostPeer() {
-// ... existing code ... -->
-                // Heartbeat periódico (a cada 3s) para manter o relógio dos convidados perfeitamente alinhado
-                if (state.syncInterval) clearInterval(state.syncInterval);
-                state.syncInterval = setInterval(() => {
-                    if (state.role !== 'host' || state.guestConnections.size === 0) return;
-
-                    if (state.mediaMode === 'local' && state.currentVideoUrl) {
-                        broadcastToGuests({
-                            type: 'SYNC_HEARTBEAT',
-                            mediaMode: 'local',
-                            currentTime: videoEl.currentTime,
-                            duration: videoEl.duration || 0,
-                            paused: videoEl.paused
+                        peer.on('open', () => {
+                            setNetworkStatus('online', 'Sala Online (P2P)');
+                            state.participants.set('host', { username: state.username, role: 'host' });
+                            updateParticipantsUI();
+                            addSystemMessage(`Sala ${state.roomCode} criada! Compartilhe o código com seus convidados.`);
                         });
-                    } else if (state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.getCurrentTime === 'function') {
-                        const ytState = state.ytPlayer.getPlayerState ? state.ytPlayer.getPlayerState() : 2;
-                        broadcastToGuests({
-                            type: 'SYNC_HEARTBEAT',
-                            mediaMode: 'youtube',
-                            currentTime: state.ytPlayer.getCurrentTime() || 0,
-                            duration: state.ytPlayer.getDuration() || 0,
-                            paused: ytState !== 1
-                        });
-                    }
-                }, 3000);
-            }
 
-            /**
-             * Processa mensagens recebidas pelo HOST e retransmite para o grupo
-             */
-            function handleHostReceiveData(conn, data) {
-                if (!data || !data.type) return;
-
-                switch (data.type) {
-                    case 'JOIN':
-                        const guestName = data.username || 'Convidado';
-                        state.guestConnections.set(conn.peer, { conn, call: null, username: guestName });
-                        state.participants.set(conn.peer, { username: guestName, role: 'guest' });
-                        updateParticipantsUI();
-
-                        const joinText = `${guestName} entrou na sala.`;
-                        addSystemMessage(joinText);
-                        
-                        // Avisa todos os outros convidados e atualiza lista de participantes
-                        broadcastToGuests({ type: 'SYSTEM_MSG', text: joinText }, conn.peer);
-                        broadcastParticipantsList();
-
-                        // Envia confirmação de boas-vindas + metadados da mídia ativa (YouTube ou Vídeo Local)
-                        if (state.mediaMode === 'youtube' && state.youtubeVideoId) {
-                            const curr = state.ytPlayer && state.ytPlayer.getCurrentTime ? state.ytPlayer.getCurrentTime() : 0;
-                            const ytState = state.ytPlayer && state.ytPlayer.getPlayerState ? state.ytPlayer.getPlayerState() : 1;
-                            conn.send({
-                                type: 'WELCOME',
-                                hostName: state.username,
-                                mediaMode: 'youtube',
-                                youtubeVideoId: state.youtubeVideoId,
-                                youtubeTitle: state.youtubeTitle,
-                                currentTime: curr,
-                                paused: ytState !== 1
-                            });
-                        } else {
-                            conn.send({
-                                type: 'WELCOME',
-                                hostName: state.username,
-                                mediaMode: state.mediaMode,
-                                hasVideo: Boolean(state.currentVideoUrl),
-                                fileName: state.currentFileName,
-                                fileSize: state.currentFileSize,
-                                currentTime: videoEl.currentTime || 0,
-                                paused: videoEl.paused
+                        peer.on('connection', (conn) => {
+                            conn.on('open', () => {
+                                state.guestConnections.set(conn.peer, { conn, call: null, username: 'Convidado' });
                             });
 
-                            // Se já existe um vídeo local carregado pelo Host, inicia o stream WebRTC imediatamente!
-                            if (state.mediaMode === 'local' && state.currentVideoUrl) {
-                                setTimeout(() => streamVideoToGuest(conn.peer), 400);
+                            conn.on('data', (data) => {
+                                handleHostReceiveData(conn, data);
+                            });
+
+                            conn.on('close', () => {
+                                const info = state.guestConnections.get(conn.peer);
+                                const leftName = info ? info.username : 'Um convidado';
+                                state.guestConnections.delete(conn.peer);
+                                state.participants.delete(conn.peer);
+                                updateParticipantsUI();
+                                addSystemMessage(`${leftName} saiu da sala.`);
+                                broadcastToGuests({ type: 'SYSTEM_MSG', text: `${leftName} saiu da sala.` });
+                                broadcastParticipantsList();
+                            });
+
+                            conn.on('error', () => {
+                                state.guestConnections.delete(conn.peer);
+                                state.participants.delete(conn.peer);
+                                updateParticipantsUI();
+                            });
+                        });
+
+                        peer.on('error', (err) => {
+                            if (err.type === 'unavailable-id') {
+                                showToast('Código em Uso', 'Gerando um novo código exclusivo para sua sala...', 'warning');
+                                const newCode = generateRoomCode();
+                                state.roomCode = newCode;
+                                displayRoomCode.textContent = newCode;
+                                try { peer.destroy(); } catch (e) {}
+                                initHostPeer();
+                            } else {
+                                setNetworkStatus('offline', 'Modo Local Ativo');
                             }
-                        }
-                        break;
+                        });
 
-                    case 'REQUEST_STREAM':
-                        if (state.mediaMode === 'local' && state.currentVideoUrl) {
-                            streamVideoToGuest(conn.peer);
-                        }
-                        break;
+                        if (state.syncInterval) clearInterval(state.syncInterval);
+                        state.syncInterval = setInterval(() => {
+                            if (state.role !== 'host') return;
+                            if (state.guestConnections.size === 0 && !state.broadcastChannel) return;
 
-                    case 'CHAT_MESSAGE':
-                        // Exibe no chat do Host e retransmite para TODOS os convidados
-                        appendChatMessage(data.username, 'guest', data.text, false);
-                        broadcastToGuests({
-                            type: 'CHAT_MESSAGE',
-                            senderId: conn.peer,
-                            username: data.username,
-                            role: 'guest',
-                            text: data.text
-                        }, conn.peer);
-                        break;
+                            if (state.mediaMode === 'local' && state.currentVideoUrl) {
+                                broadcastToGuests({
+                                    type: 'SYNC_HEARTBEAT',
+                                    mediaMode: 'local',
+                                    currentTime: videoEl.currentTime,
+                                    duration: videoEl.duration || 0,
+                                    paused: videoEl.paused
+                                });
+                            } else if (state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.getCurrentTime === 'function') {
+                                const ytState = state.ytPlayer.getPlayerState ? state.ytPlayer.getPlayerState() : 2;
+                                broadcastToGuests({
+                                    type: 'SYNC_HEARTBEAT',
+                                    mediaMode: 'youtube',
+                                    currentTime: state.ytPlayer.getCurrentTime() || 0,
+                                    duration: state.ytPlayer.getDuration() || 0,
+                                    paused: ytState !== 1
+                                });
+                            }
+                        }, 3000);
+                    } catch (e) {
+                        setNetworkStatus('online', 'Modo Local Ativo');
+                    }
                 }
-            }
 
-            /**
-             * Envia dados do Host para todos os convidados conectados (opcionalmente ignorando um peerId)
-             */
-// ... existing code ... -->
-            /**
-             * Processa comandos de controle, sincronização e chat recebidos pelo CONVIDADO
-             */
-            function handleGuestReceiveData(data) {
-                if (!data || !data.type) return;
+                function handleHostReceiveData(conn, data) {
+                    if (!data || !data.type) return;
 
-                switch (data.type) {
-                    case 'WELCOME':
-                        addSystemMessage(`Conectado à sala de ${data.hostName}!`);
-                        if (data.mediaMode === 'youtube' && data.youtubeVideoId) {
+                    switch (data.type) {
+                        case 'JOIN':
+                            const guestName = data.username || 'Convidado';
+                            state.guestConnections.set(conn.peer, { conn, call: null, username: guestName });
+                            state.participants.set(conn.peer, { username: guestName, role: 'guest' });
+                            updateParticipantsUI();
+
+                            const joinText = `${guestName} entrou na sala.`;
+                            addSystemMessage(joinText);
+                            
+                            broadcastToGuests({ type: 'SYSTEM_MSG', text: joinText }, conn.peer);
+                            broadcastParticipantsList();
+
+                            if (state.mediaMode === 'youtube' && state.youtubeVideoId) {
+                                const curr = state.ytPlayer && state.ytPlayer.getCurrentTime ? state.ytPlayer.getCurrentTime() : 0;
+                                const ytState = state.ytPlayer && state.ytPlayer.getPlayerState ? state.ytPlayer.getPlayerState() : 1;
+                                conn.send({
+                                    type: 'WELCOME',
+                                    hostName: state.username,
+                                    mediaMode: 'youtube',
+                                    youtubeVideoId: state.youtubeVideoId,
+                                    youtubeTitle: state.youtubeTitle,
+                                    currentTime: curr,
+                                    paused: ytState !== 1
+                                });
+                            } else {
+                                conn.send({
+                                    type: 'WELCOME',
+                                    hostName: state.username,
+                                    mediaMode: state.mediaMode,
+                                    hasVideo: Boolean(state.currentVideoUrl),
+                                    fileName: state.currentFileName,
+                                    fileSize: state.currentFileSize,
+                                    currentTime: videoEl.currentTime || 0,
+                                    paused: videoEl.paused
+                                });
+
+                                if (state.mediaMode === 'local' && state.currentVideoUrl) {
+                                    setTimeout(() => streamVideoToGuest(conn.peer), 400);
+                                }
+                            }
+                            break;
+
+                        case 'REQUEST_STREAM':
+                            if (state.mediaMode === 'local' && state.currentVideoUrl) {
+                                streamVideoToGuest(conn.peer);
+                            }
+                            break;
+
+                        case 'CHAT_MESSAGE':
+                            appendChatMessage(data.username, 'guest', data.text, false);
+                            broadcastToGuests({
+                                type: 'CHAT_MESSAGE',
+                                senderId: conn.peer,
+                                username: data.username,
+                                role: 'guest',
+                                text: data.text
+                            }, conn.peer);
+                            break;
+                    }
+                }
+
+                function broadcastToGuests(payload, excludePeerId = null) {
+                    if (state.role !== 'host') return;
+                    state.guestConnections.forEach((entry, peerId) => {
+                        if (peerId !== excludePeerId && entry.conn && entry.conn.open) {
+                            try {
+                                entry.conn.send(payload);
+                            } catch (e) {}
+                        }
+                    });
+                    if (state.broadcastChannel) {
+                        try {
+                            state.broadcastChannel.postMessage({ target: 'guest', payload });
+                        } catch (e) {}
+                    }
+                }
+
+                function broadcastParticipantsList() {
+                    const list = Array.from(state.participants.values());
+                    broadcastToGuests({
+                        type: 'PARTICIPANTS_UPDATE',
+                        list: list
+                    });
+                }
+
+                function initGuestPeer() {
+                    try {
+                        if (state.peer) {
+                            try { state.peer.destroy(); } catch (e) {}
+                        }
+
+                        const peer = new window.Peer(PEER_CONFIG);
+                        state.peer = peer;
+                        const hostPeerId = PEER_PREFIX + state.roomCode;
+
+                        // Também envia JOIN via BroadcastChannel caso o Host esteja em outra aba local
+                        if (state.broadcastChannel) {
+                            try {
+                                state.broadcastChannel.postMessage({
+                                    target: 'host',
+                                    senderId: state.localTabId,
+                                    payload: { type: 'JOIN', username: state.username }
+                                });
+                            } catch (e) {}
+                        }
+
+                        peer.on('open', () => {
+                            const conn = peer.connect(hostPeerId, { reliable: true });
+                            state.hostConnection = conn;
+
+                            conn.on('open', () => {
+                                setNetworkStatus('online', 'Conectado ao Host');
+                                btnReconnect.classList.add('hidden');
+                                conn.send({
+                                    type: 'JOIN',
+                                    username: state.username
+                                });
+                            });
+
+                            conn.on('data', (data) => {
+                                handleGuestReceiveData(data);
+                            });
+
+                            conn.on('close', () => {
+                                setNetworkStatus('offline', 'Host desconectado');
+                                btnReconnect.classList.remove('hidden');
+                                btnReconnect.classList.add('inline-flex');
+                                updateGuestBanner('error', 'Conexão com o Host encerrada. Clique em <strong>Reconectar</strong>.');
+                                updateVideoSyncOverlay('waiting', 'Desconectado do Host');
+                                addSystemMessage('A conexão com o Host foi encerrada.');
+                            });
+
+                            conn.on('error', () => {
+                                setNetworkStatus('offline', 'Erro de conexão');
+                                btnReconnect.classList.remove('hidden');
+                                btnReconnect.classList.add('inline-flex');
+                            });
+                        });
+
+                        peer.on('call', (call) => {
+                            state.activeMediaCall = call;
+                            call.answer();
+
+                            call.on('stream', (remoteStream) => {
+                                if (state.guestUsingLocalFile || state.mediaMode === 'youtube') return;
+
+                                destroyYouTubePlayer();
+                                state.mediaMode = 'local';
+                                videoPlaceholder.classList.add('hidden');
+                                videoEl.classList.remove('hidden');
+                                customControls.classList.remove('hidden');
+                                activeMediaFooter.classList.remove('hidden');
+
+                                videoEl.src = '';
+                                videoEl.srcObject = remoteStream;
+                                videoEl.muted = false;
+                                videoEl.play().then(() => {
+                                    updatePlayPauseUI(false);
+                                }).catch(() => {
+                                    videoEl.muted = true;
+                                    videoEl.play().catch(() => {});
+                                    updateVolumeIcon();
+                                    showToast('Áudio Silenciado', 'Clique no ícone de som no player para ativar o áudio.', 'info');
+                                });
+
+                                updateGuestBanner('streaming', 'Assistindo transmissão ao vivo do <strong>Host</strong>.');
+                                updateVideoSyncOverlay('synced', 'Sincronizado com o Host');
+                                syncModeText.textContent = 'Stream P2P ao Vivo';
+                            });
+                        });
+
+                        peer.on('error', (err) => {
+                            if (err.type === 'peer-unavailable') {
+                                setNetworkStatus('offline', 'Sala não encontrada');
+                                btnReconnect.classList.remove('hidden');
+                                btnReconnect.classList.add('inline-flex');
+                                updateGuestBanner('error', `Sala <strong>${state.roomCode}</strong> não encontrada. Verifique o código.`);
+                                placeholderTitle.textContent = 'Sala não encontrada';
+                                placeholderSubtitle.textContent = 'Peça ao Host para verificar se a sala está aberta e clique em Reconectar.';
+                            } else {
+                                setNetworkStatus('offline', 'Falha na rede');
+                                btnReconnect.classList.remove('hidden');
+                                btnReconnect.classList.add('inline-flex');
+                            }
+                        });
+                    } catch (e) {
+                        setNetworkStatus('offline', 'Erro de rede');
+                    }
+                }
+
+                function handleGuestReceiveData(data) {
+                    if (!data || !data.type) return;
+
+                    switch (data.type) {
+                        case 'WELCOME':
+                            setNetworkStatus('online', 'Conectado ao Host');
+                            addSystemMessage(`Conectado à sala de ${data.hostName}!`);
+                            if (data.mediaMode === 'youtube' && data.youtubeVideoId) {
+                                state.mediaMode = 'youtube';
+                                state.youtubeVideoId = data.youtubeVideoId;
+                                state.youtubeTitle = data.youtubeTitle;
+                                loadYouTubeIntoPlayer(data.youtubeVideoId, data.youtubeTitle, data.currentTime || 0, !data.paused);
+                            } else if (data.hasVideo) {
+                                state.mediaMode = 'local';
+                                state.currentFileName = data.fileName;
+                                state.currentFileSize = data.fileSize;
+                                guestFileBadge.textContent = data.fileName;
+                                guestFileBadge.classList.remove('hidden');
+                                guestLocalUploadWrapper.classList.remove('hidden');
+                                activeFileName.textContent = data.fileName;
+                                activeFileSize.textContent = formatBytes(data.fileSize);
+
+                                updateGuestBanner('connecting', `Recebendo vídeo <strong>"${data.fileName}"</strong> do Host...`);
+                                updateVideoSyncOverlay('waiting', 'Recebendo transmissão...');
+                                placeholderTitle.textContent = 'Carregando transmissão do Host...';
+                                placeholderSubtitle.textContent = `O Host está exibindo "${data.fileName}". O vídeo iniciará em instantes.`;
+                            } else {
+                                updateGuestBanner('connected', 'Conectado! Aguardando o <strong>Host</strong> escolher um vídeo.');
+                                updateVideoSyncOverlay('waiting', 'Aguardando vídeo do Host');
+                                placeholderTitle.textContent = 'Conectado à sala!';
+                                placeholderSubtitle.textContent = 'Aguardando o Host selecionar um vídeo do YouTube ou arquivo local.';
+                            }
+                            break;
+
+                        case 'LOAD_YOUTUBE':
                             state.mediaMode = 'youtube';
-                            state.youtubeVideoId = data.youtubeVideoId;
-                            state.youtubeTitle = data.youtubeTitle;
-                            loadYouTubeIntoPlayer(data.youtubeVideoId, data.youtubeTitle, data.currentTime || 0, !data.paused);
-                        } else if (data.hasVideo) {
+                            state.guestUsingLocalFile = false;
+                            state.youtubeVideoId = data.videoId;
+                            state.youtubeTitle = data.title;
+                            loadYouTubeIntoPlayer(data.videoId, data.title, data.currentTime || 0, data.autoplay !== false);
+                            addSystemMessage(`O Host iniciou o vídeo do YouTube: "${data.title}".`);
+                            break;
+
+                        case 'VIDEO_LOADED':
+                            destroyYouTubePlayer();
                             state.mediaMode = 'local';
                             state.currentFileName = data.fileName;
                             state.currentFileSize = data.fileSize;
@@ -974,488 +1745,673 @@
                             guestLocalUploadWrapper.classList.remove('hidden');
                             activeFileName.textContent = data.fileName;
                             activeFileSize.textContent = formatBytes(data.fileSize);
-
-                            updateGuestBanner('connecting', `Recebendo vídeo <strong>"${data.fileName}"</strong> do Host...`);
-                            updateVideoSyncOverlay('waiting', 'Recebendo transmissão...');
-                            placeholderTitle.textContent = 'Carregando transmissão do Host...';
-                            placeholderSubtitle.textContent = `O Host está exibindo "${data.fileName}". O vídeo iniciará em instantes.`;
-                        } else {
-                            updateGuestBanner('connected', 'Conectado! Aguardando o <strong>Host</strong> escolher um vídeo.');
-                            updateVideoSyncOverlay('waiting', 'Aguardando vídeo do Host');
-                            placeholderTitle.textContent = 'Conectado à sala!';
-                            placeholderSubtitle.textContent = 'Aguardando o Host selecionar um vídeo do YouTube ou arquivo local.';
-                        }
-                        break;
-
-                    case 'LOAD_YOUTUBE':
-                        state.mediaMode = 'youtube';
-                        state.guestUsingLocalFile = false;
-                        state.youtubeVideoId = data.videoId;
-                        state.youtubeTitle = data.title;
-                        loadYouTubeIntoPlayer(data.videoId, data.title, data.currentTime || 0, data.autoplay !== false);
-                        addSystemMessage(`O Host iniciou o vídeo do YouTube: "${data.title}".`);
-                        break;
-
-                    case 'VIDEO_LOADED':
-                        destroyYouTubePlayer();
-                        state.mediaMode = 'local';
-                        state.currentFileName = data.fileName;
-                        state.currentFileSize = data.fileSize;
-                        guestFileBadge.textContent = data.fileName;
-                        guestFileBadge.classList.remove('hidden');
-                        guestLocalUploadWrapper.classList.remove('hidden');
-                        activeFileName.textContent = data.fileName;
-                        activeFileSize.textContent = formatBytes(data.fileSize);
-                        
-                        addSystemMessage(`O Host carregou "${data.fileName}" (${formatBytes(data.fileSize)}).`);
-                        if (!state.guestUsingLocalFile) {
-                            updateGuestBanner('connecting', `O Host carregou <strong>"${data.fileName}"</strong>. Iniciando transmissão...`);
-                            updateVideoSyncOverlay('waiting', 'Iniciando transmissão...');
-                        }
-                        break;
-
-                    case 'VIDEO_PLAY':
-                        if (state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.playVideo === 'function') {
-                            const curr = state.ytPlayer.getCurrentTime ? state.ytPlayer.getCurrentTime() : 0;
-                            if (typeof data.currentTime === 'number' && Math.abs(curr - data.currentTime) > 1.0) {
-                                state.ytPlayer.seekTo(data.currentTime, true);
-                            }
-                            state.ytPlayer.playVideo();
-                            updatePlayPauseUI(false);
-                            updateVideoSyncOverlay('synced', 'Sincronizado com o Host');
-                        } else if (videoEl.src || videoEl.srcObject) {
-                            if (state.guestUsingLocalFile && Math.abs(videoEl.currentTime - data.currentTime) > 0.6) {
-                                videoEl.currentTime = data.currentTime;
-                            }
-                            videoEl.play().catch(() => {});
-                            updatePlayPauseUI(false);
-                            updateVideoSyncOverlay('synced', 'Sincronizado com o Host');
-                        }
-                        break;
-
-                    case 'VIDEO_PAUSE':
-                        if (state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.pauseVideo === 'function') {
-                            state.ytPlayer.pauseVideo();
-                            if (typeof data.currentTime === 'number') {
-                                state.ytPlayer.seekTo(data.currentTime, true);
-                            }
-                            updatePlayPauseUI(true);
-                            updateVideoSyncOverlay('synced', 'Pausado pelo Host');
-                        } else if (videoEl.src || videoEl.srcObject) {
-                            videoEl.pause();
-                            if (state.guestUsingLocalFile) {
-                                videoEl.currentTime = data.currentTime;
-                            }
-                            updatePlayPauseUI(true);
-                            updateVideoSyncOverlay('synced', 'Pausado pelo Host');
-                        }
-                        break;
-
-                    case 'VIDEO_SEEK':
-                        if (state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.seekTo === 'function') {
-                            state.ytPlayer.seekTo(data.currentTime, true);
-                            updateVideoSyncOverlay('synced', 'Sincronizado com o Host');
-                        } else if (state.guestUsingLocalFile && videoEl.src) {
-                            videoEl.currentTime = data.currentTime;
-                            updateVideoSyncOverlay('synced', 'Sincronizado com o Host');
-                        }
-                        break;
-
-                    case 'SYNC_HEARTBEAT':
-                        if (data.mediaMode === 'youtube' && state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.getCurrentTime === 'function') {
-                            const curr = state.ytPlayer.getCurrentTime() || 0;
-                            if (Math.abs(curr - data.currentTime) > 1.8) {
-                                state.ytPlayer.seekTo(data.currentTime, true);
-                            }
-                            const ytState = state.ytPlayer.getPlayerState ? state.ytPlayer.getPlayerState() : 2;
-                            if (data.paused && ytState === 1) {
-                                state.ytPlayer.pauseVideo();
-                                updatePlayPauseUI(true);
-                            } else if (!data.paused && ytState !== 1) {
-                                state.ytPlayer.playVideo();
-                                updatePlayPauseUI(false);
+                            
+                            addSystemMessage(`O Host carregou "${data.fileName}" (${formatBytes(data.fileSize)}).`);
+                            if (!state.guestUsingLocalFile) {
+                                updateGuestBanner('connecting', `O Host carregou <strong>"${data.fileName}"</strong>. Iniciando transmissão...`);
+                                updateVideoSyncOverlay('waiting', 'Iniciando transmissão...');
                             }
                             break;
-                        }
 
-                        // Atualiza duração e barra visual mesmo no modo stream
-                        if (data.duration && !state.guestUsingLocalFile && state.mediaMode === 'local') {
-                            timeCurrent.textContent = formatTime(data.currentTime);
-                            timeDuration.textContent = formatTime(data.duration);
-                            seekBar.value = (data.currentTime / data.duration) * 100;
-                        }
-                        if (state.guestUsingLocalFile && videoEl.src) {
-                            if (Math.abs(videoEl.currentTime - data.currentTime) > 1.2) {
-                                videoEl.currentTime = data.currentTime;
-                            }
-                            if (data.paused && !videoEl.paused) {
-                                videoEl.pause();
-                                updatePlayPauseUI(true);
-                            } else if (!data.paused && videoEl.paused) {
+                        case 'VIDEO_PLAY':
+                            if (state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.playVideo === 'function') {
+                                const curr = state.ytPlayer.getCurrentTime ? state.ytPlayer.getCurrentTime() : 0;
+                                if (typeof data.currentTime === 'number' && Math.abs(curr - data.currentTime) > 1.0) {
+                                    state.ytPlayer.seekTo(data.currentTime, true);
+                                }
+                                state.ytPlayer.playVideo();
+                                updatePlayPauseUI(false);
+                                updateVideoSyncOverlay('synced', 'Sincronizado com o Host');
+                            } else if (videoEl.src || videoEl.srcObject) {
+                                if (state.guestUsingLocalFile && Math.abs(videoEl.currentTime - data.currentTime) > 0.6) {
+                                    videoEl.currentTime = data.currentTime;
+                                }
                                 videoEl.play().catch(() => {});
                                 updatePlayPauseUI(false);
+                                updateVideoSyncOverlay('synced', 'Sincronizado com o Host');
                             }
-                        }
-                        break;
+                            break;
 
-                    case 'CHAT_MESSAGE':
-                        appendChatMessage(data.username, data.role, data.text, false);
-                        break;
+                        case 'VIDEO_PAUSE':
+                            if (state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.pauseVideo === 'function') {
+                                state.ytPlayer.pauseVideo();
+                                if (typeof data.currentTime === 'number') {
+                                    state.ytPlayer.seekTo(data.currentTime, true);
+                                }
+                                updatePlayPauseUI(true);
+                                updateVideoSyncOverlay('synced', 'Pausado pelo Host');
+                            } else if (videoEl.src || videoEl.srcObject) {
+                                videoEl.pause();
+                                if (state.guestUsingLocalFile) {
+                                    videoEl.currentTime = data.currentTime;
+                                }
+                                updatePlayPauseUI(true);
+                                updateVideoSyncOverlay('synced', 'Pausado pelo Host');
+                            }
+                            break;
 
-                    case 'SYSTEM_MSG':
-                        addSystemMessage(data.text);
-                        break;
+                        case 'VIDEO_SEEK':
+                            if (state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.seekTo === 'function') {
+                                state.ytPlayer.seekTo(data.currentTime, true);
+                                updateVideoSyncOverlay('synced', 'Sincronizado com o Host');
+                            } else if (state.guestUsingLocalFile && videoEl.src) {
+                                videoEl.currentTime = data.currentTime;
+                                updateVideoSyncOverlay('synced', 'Sincronizado com o Host');
+                            }
+                            break;
 
-                    case 'PARTICIPANTS_UPDATE':
-                        if (Array.isArray(data.list)) {
-                            viewerCountEl.textContent = Math.max(1, data.list.length);
-                            const names = data.list.map(p => `${p.username}${p.role === 'host' ? ' (Host)' : ''}`).join(', ');
-                            viewersPill.title = `Na sala: ${names}`;
-                        }
-                        break;
-                }
-            }
+                        case 'SYNC_HEARTBEAT':
+                            if (data.mediaMode === 'youtube' && state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.getCurrentTime === 'function') {
+                                const curr = state.ytPlayer.getCurrentTime() || 0;
+                                if (Math.abs(curr - data.currentTime) > 1.8) {
+                                    state.ytPlayer.seekTo(data.currentTime, true);
+                                }
+                                const ytState = state.ytPlayer.getPlayerState ? state.ytPlayer.getPlayerState() : 2;
+                                if (data.paused && ytState === 1) {
+                                    state.ytPlayer.pauseVideo();
+                                    updatePlayPauseUI(true);
+                                } else if (!data.paused && ytState !== 1) {
+                                    state.ytPlayer.playVideo();
+                                    updatePlayPauseUI(false);
+                                }
+                                break;
+                            }
 
-            function updateParticipantsUI() {
-// ... existing code ... -->
-            /**
-             * Sai da sala e limpa todas as conexões P2P e streams
-             */
-            function leaveRoom() {
-                if (state.syncInterval) {
-                    clearInterval(state.syncInterval);
-                    state.syncInterval = null;
-                }
-                destroyYouTubePlayer();
-                if (state.activeMediaCall) {
-                    try { state.activeMediaCall.close(); } catch (e) {}
-                    state.activeMediaCall = null;
-                }
-                if (state.hostConnection) {
-                    try { state.hostConnection.close(); } catch (e) {}
-                    state.hostConnection = null;
-                }
-                state.guestConnections.forEach((entry) => {
-                    try { if (entry.call) entry.call.close(); } catch (e) {}
-                    try { if (entry.conn) entry.conn.close(); } catch (e) {}
-                });
-                state.guestConnections.clear();
+                            if (data.duration && !state.guestUsingLocalFile && state.mediaMode === 'local') {
+                                timeCurrent.textContent = formatTime(data.currentTime);
+                                timeDuration.textContent = formatTime(data.duration);
+                                seekBar.value = (data.currentTime / data.duration) * 100;
+                            }
+                            if (state.guestUsingLocalFile && videoEl.src) {
+                                if (Math.abs(videoEl.currentTime - data.currentTime) > 1.2) {
+                                    videoEl.currentTime = data.currentTime;
+                                }
+                                if (data.paused && !videoEl.paused) {
+                                    videoEl.pause();
+                                    updatePlayPauseUI(true);
+                                } else if (!data.paused && videoEl.paused) {
+                                    videoEl.play().catch(() => {});
+                                    updatePlayPauseUI(false);
+                                }
+                            }
+                            break;
 
-                if (state.peer) {
-                    try { state.peer.destroy(); } catch (e) {}
-                    state.peer = null;
-                }
-                if (state.currentVideoUrl) {
-                    URL.revokeObjectURL(state.currentVideoUrl);
-                    state.currentVideoUrl = null;
-                }
+                        case 'CHAT_MESSAGE':
+                            appendChatMessage(data.username, data.role, data.text, false);
+                            break;
 
-                // Reseta player de vídeo
-                videoEl.pause();
-                videoEl.srcObject = null;
-                videoEl.removeAttribute('src');
-                videoEl.load();
-                videoEl.classList.add('hidden');
-                customControls.classList.add('hidden');
-                activeMediaFooter.classList.add('hidden');
-                ytResultsDrawer.classList.add('hidden');
-                videoPlaceholder.classList.remove('hidden');
-                chatMessages.innerHTML = '';
+                        case 'SYSTEM_MSG':
+                            addSystemMessage(data.text);
+                            break;
 
-                state.roomCode = null;
-                state.role = null;
-                state.mediaMode = 'none';
-                state.youtubeVideoId = null;
-                state.guestUsingLocalFile = false;
-
-                roomView.classList.add('hidden');
-                lobbyView.classList.remove('hidden');
-            }
-
-            // ==========================================
-            // UPLOAD DE VÍDEO (LIMITE 5 GB + DRAG & DROP)
-            // ==========================================
-
-            function handleHostFileSelection(file) {
-                if (state.role !== 'host' || !file) return;
-
-                // Validação estrita de tamanho máximo: 5 GB
-                if (file.size > MAX_FILE_SIZE_BYTES) {
-                    const sizeGB = (file.size / (1024 * 1024 * 1024)).toFixed(2);
-                    showToast(
-                        'Arquivo Excede o Limite de 5 GB',
-                        `O arquivo selecionado possui ${sizeGB} GB. O limite máximo permitido nesta sala é de 5.00 GB.`,
-                        'error'
-                    );
-                    videoFileInput.value = '';
-                    return;
-                }
-
-                // Encerra player do YouTube caso estivesse ativo
-                destroyYouTubePlayer();
-                ytResultsDrawer.classList.add('hidden');
-
-                if (state.currentVideoUrl) {
-                    URL.revokeObjectURL(state.currentVideoUrl);
-                }
-
-                const objectUrl = URL.createObjectURL(file);
-                state.mediaMode = 'local';
-                state.youtubeVideoId = null;
-                state.currentVideoUrl = objectUrl;
-                state.currentFileName = file.name;
-                state.currentFileSize = file.size;
-
-                videoPlaceholder.classList.add('hidden');
-                videoEl.classList.remove('hidden');
-                customControls.classList.remove('hidden');
-                activeMediaFooter.classList.remove('hidden');
-
-                activeFileName.textContent = file.name;
-                activeFileSize.textContent = formatBytes(file.size);
-                syncModeText.textContent = 'Transmitindo para a Sala';
-
-                videoEl.srcObject = null;
-                videoEl.src = objectUrl;
-                videoEl.load();
-                updatePlayPauseUI(true);
-
-                uploadBtnLabel.textContent = 'Trocar Vídeo';
-                fileInfoText.innerHTML = `Arquivo ativo: <strong class="text-emerald-400">${escapeHtml(file.name)}</strong> (${formatBytes(file.size)})`;
-
-                // Avisa os convidados sobre o novo vídeo e inicia o stream WebRTC
-                broadcastToGuests({
-                    type: 'VIDEO_LOADED',
-                    fileName: file.name,
-                    fileSize: file.size
-                });
-
-                videoEl.onloadeddata = () => {
-                    streamVideoToAllGuests();
-                };
-
-                addSystemMessage(`Você carregou "${file.name}" (${formatBytes(file.size)}).`);
-                showToast('Vídeo Pronto!', 'Dê Play para iniciar a sessão com todos os convidados.', 'success');
-            }
-
-            videoFileInput.addEventListener('change', (e) => {
-                handleHostFileSelection(e.target.files[0]);
-            });
-
-            // Eventos da Barra de Pesquisa do YouTube
-            ytSearchInput.addEventListener('input', () => {
-                if (ytSearchInput.value.trim().length > 0) {
-                    btnClearYtSearch.classList.remove('hidden');
-                } else {
-                    btnClearYtSearch.classList.add('hidden');
-                }
-            });
-
-            btnClearYtSearch.addEventListener('click', () => {
-                ytSearchInput.value = '';
-                btnClearYtSearch.classList.add('hidden');
-                ytResultsDrawer.classList.add('hidden');
-                ytSearchInput.focus();
-            });
-
-            btnCloseYtResults.addEventListener('click', () => {
-                ytResultsDrawer.classList.add('hidden');
-            });
-
-            ytSearchForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                if (state.role !== 'host') return;
-                const query = ytSearchInput.value.trim();
-                if (!query) {
-                    showToast('Pesquisa Vazia', 'Digite o nome de um vídeo ou cole um link do YouTube.', 'warning');
-                    ytSearchInput.focus();
-                    return;
-                }
-                searchYouTubeVideos(query);
-            });
-
-            // Suporte a Drag & Drop no painel de upload do Host
-// ... existing code ... -->
-            // ==========================================
-            // CONTROLES DO PLAYER DE VÍDEO
-            // ==========================================
-
-            function updatePlayPauseUI(isPaused) {
-                if (isPaused) {
-                    iconPlay.classList.remove('hidden');
-                    iconPause.classList.add('hidden');
-                } else {
-                    iconPlay.classList.add('hidden');
-                    iconPause.classList.remove('hidden');
-                }
-            }
-
-            // Botão Play/Pause (Apenas Host — suporta YouTube e Vídeo Local)
-            btnPlayPause.addEventListener('click', () => {
-                if (state.role !== 'host') return;
-
-                if (state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.getPlayerState === 'function') {
-                    const ytState = state.ytPlayer.getPlayerState();
-                    const curr = state.ytPlayer.getCurrentTime ? state.ytPlayer.getCurrentTime() : 0;
-                    if (ytState !== 1) {
-                        state.ytPlayer.playVideo();
-                        updatePlayPauseUI(false);
-                        broadcastToGuests({ type: 'VIDEO_PLAY', currentTime: curr });
-                    } else {
-                        state.ytPlayer.pauseVideo();
-                        updatePlayPauseUI(true);
-                        broadcastToGuests({ type: 'VIDEO_PAUSE', currentTime: curr });
-                    }
-                    return;
-                }
-
-                if (!videoEl.src) return;
-                if (videoEl.paused) {
-                    videoEl.play();
-                    updatePlayPauseUI(false);
-                    broadcastToGuests({ type: 'VIDEO_PLAY', currentTime: videoEl.currentTime });
-                } else {
-                    videoEl.pause();
-                    updatePlayPauseUI(true);
-                    broadcastToGuests({ type: 'VIDEO_PAUSE', currentTime: videoEl.currentTime });
-                }
-            });
-
-            videoEl.addEventListener('click', () => {
-                if (state.role === 'host') {
-                    btnPlayPause.click();
-                }
-            });
-
-            ytClickShield.addEventListener('click', () => {
-                if (state.role === 'host') {
-                    btnPlayPause.click();
-                }
-            });
-
-            // Voltar 10 segundos (Apenas Host)
-            btnRewind.addEventListener('click', () => {
-                if (state.role !== 'host') return;
-
-                if (state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.seekTo === 'function') {
-                    const target = Math.max(0, (state.ytPlayer.getCurrentTime() || 0) - 10);
-                    state.ytPlayer.seekTo(target, true);
-                    timeCurrent.textContent = formatTime(target);
-                    broadcastToGuests({ type: 'VIDEO_SEEK', currentTime: target });
-                    return;
-                }
-
-                if (!videoEl.src) return;
-                videoEl.currentTime = Math.max(0, videoEl.currentTime - 10);
-                broadcastToGuests({ type: 'VIDEO_SEEK', currentTime: videoEl.currentTime });
-            });
-
-            // Avançar 10 segundos (Apenas Host)
-            btnForward.addEventListener('click', () => {
-                if (state.role !== 'host') return;
-
-                if (state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.seekTo === 'function') {
-                    const dur = state.ytPlayer.getDuration() || 0;
-                    const target = Math.min(dur, (state.ytPlayer.getCurrentTime() || 0) + 10);
-                    state.ytPlayer.seekTo(target, true);
-                    timeCurrent.textContent = formatTime(target);
-                    broadcastToGuests({ type: 'VIDEO_SEEK', currentTime: target });
-                    return;
-                }
-
-                if (!videoEl.src) return;
-                videoEl.currentTime = Math.min(videoEl.duration || 0, videoEl.currentTime + 10);
-                broadcastToGuests({ type: 'VIDEO_SEEK', currentTime: videoEl.currentTime });
-            });
-
-            // Barra de Progresso (Seekbar - Apenas Host)
-            seekBar.addEventListener('input', () => {
-                if (state.role !== 'host') return;
-                const dur = state.mediaMode === 'youtube' && state.ytPlayer && state.ytPlayer.getDuration
-                    ? (state.ytPlayer.getDuration() || 0)
-                    : (videoEl.duration || 0);
-                if (!dur) return;
-                const seekTo = (seekBar.value / 100) * dur;
-                timeCurrent.textContent = formatTime(seekTo);
-            });
-
-            seekBar.addEventListener('change', () => {
-                if (state.role !== 'host') return;
-
-                if (state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.seekTo === 'function') {
-                    const dur = state.ytPlayer.getDuration() || 0;
-                    const seekTo = (seekBar.value / 100) * dur;
-                    state.ytPlayer.seekTo(seekTo, true);
-                    broadcastToGuests({ type: 'VIDEO_SEEK', currentTime: seekTo });
-                    return;
-                }
-
-                if (!videoEl.src) return;
-                const seekTo = (seekBar.value / 100) * (videoEl.duration || 0);
-                videoEl.currentTime = seekTo;
-                broadcastToGuests({ type: 'VIDEO_SEEK', currentTime: seekTo });
-            });
-
-            // Atualização contínua do tempo do vídeo
-// ... existing code ... -->
-            // Controles Locais: Volume, Mudo e Tela Cheia (Disponível para Host e Convidado)
-            volumeBar.addEventListener('input', (e) => {
-                const vol = parseFloat(e.target.value);
-                videoEl.volume = vol;
-                videoEl.muted = vol === 0;
-                if (state.ytPlayer && typeof state.ytPlayer.setVolume === 'function') {
-                    state.ytPlayer.setVolume(Math.round(vol * 100));
-                    if (vol === 0) state.ytPlayer.mute();
-                    else state.ytPlayer.unMute();
-                }
-                updateVolumeIcon();
-            });
-
-            btnMute.addEventListener('click', () => {
-                videoEl.muted = !videoEl.muted;
-                if (!videoEl.muted && videoEl.volume === 0) {
-                    videoEl.volume = 0.5;
-                    volumeBar.value = 0.5;
-                }
-                if (state.ytPlayer && typeof state.ytPlayer.mute === 'function') {
-                    if (videoEl.muted) {
-                        state.ytPlayer.mute();
-                    } else {
-                        state.ytPlayer.unMute();
-                        state.ytPlayer.setVolume(Math.round(parseFloat(volumeBar.value) * 100));
+                        case 'PARTICIPANTS_UPDATE':
+                            if (Array.isArray(data.list)) {
+                                viewerCountEl.textContent = Math.max(1, data.list.length);
+                                const names = data.list.map(p => `${p.username}${p.role === 'host' ? ' (Host)' : ''}`).join(', ');
+                                viewersPill.title = `Na sala: ${names}`;
+                            }
+                            break;
                     }
                 }
-                updateVolumeIcon();
-            });
 
-            function updateVolumeIcon() {
-// ... existing code ... -->
-            btnForceSync.addEventListener('click', () => {
-                if (state.role !== 'host') return;
-                if (state.mediaMode === 'youtube' && state.youtubeVideoId) {
-                    const curr = state.ytPlayer && state.ytPlayer.getCurrentTime ? state.ytPlayer.getCurrentTime() : 0;
-                    const ytState = state.ytPlayer && state.ytPlayer.getPlayerState ? state.ytPlayer.getPlayerState() : 1;
-                    broadcastToGuests({
-                        type: 'LOAD_YOUTUBE',
-                        videoId: state.youtubeVideoId,
-                        title: state.youtubeTitle,
-                        currentTime: curr,
-                        autoplay: ytState === 1
+                function updateParticipantsUI() {
+                    const count = Math.max(1, state.participants.size);
+                    viewerCountEl.textContent = count;
+                    const names = Array.from(state.participants.values())
+                        .map(p => `${p.username}${p.role === 'host' ? ' (Host)' : ''}`)
+                        .join(', ');
+                    viewersPill.title = `Na sala: ${names}`;
+                }
+
+                function leaveRoom() {
+                    if (state.syncInterval) {
+                        clearInterval(state.syncInterval);
+                        state.syncInterval = null;
+                    }
+                    destroyYouTubePlayer();
+                    if (state.activeMediaCall) {
+                        try { state.activeMediaCall.close(); } catch (e) {}
+                        state.activeMediaCall = null;
+                    }
+                    if (state.hostConnection) {
+                        try { state.hostConnection.close(); } catch (e) {}
+                        state.hostConnection = null;
+                    }
+                    state.guestConnections.forEach((entry) => {
+                        try { if (entry.call) entry.call.close(); } catch (e) {}
+                        try { if (entry.conn) entry.conn.close(); } catch (e) {}
                     });
-                    showToast('Sincronização Enviada', 'Vídeo do YouTube e tempo atual reenviados para todos os convidados.', 'success');
-                    return;
-                }
-                if (!state.currentVideoUrl) {
-                    showToast('Nenhum Vídeo', 'Pesquise um vídeo no YouTube ou carregue um arquivo primeiro antes de sincronizar.', 'warning');
-                    return;
-                }
-                streamVideoToAllGuests();
-                broadcastToGuests({
-                    type: videoEl.paused ? 'VIDEO_PAUSE' : 'VIDEO_PLAY',
-                    currentTime: videoEl.currentTime
-                });
-                showToast('Sincronização Enviada', 'Transmissão e tempo atual reenviados para todos os convidados.', 'success');
-            });
+                    state.guestConnections.clear();
 
-            btnReconnect.addEventListener('click', () => {
-// ... existing code ... -->
+                    if (state.broadcastChannel) {
+                        try { state.broadcastChannel.close(); } catch (e) {}
+                        state.broadcastChannel = null;
+                    }
+
+                    if (state.peer) {
+                        try { state.peer.destroy(); } catch (e) {}
+                        state.peer = null;
+                    }
+                    if (state.currentVideoUrl) {
+                        try { URL.revokeObjectURL(state.currentVideoUrl); } catch (e) {}
+                        state.currentVideoUrl = null;
+                    }
+
+                    videoEl.pause();
+                    videoEl.srcObject = null;
+                    videoEl.removeAttribute('src');
+                    videoEl.load();
+                    videoEl.classList.add('hidden');
+                    customControls.classList.add('hidden');
+                    activeMediaFooter.classList.add('hidden');
+                    ytResultsDrawer.classList.add('hidden');
+                    videoPlaceholder.classList.remove('hidden');
+                    chatMessages.innerHTML = '';
+
+                    state.roomCode = null;
+                    state.role = null;
+                    state.mediaMode = 'none';
+                    state.youtubeVideoId = null;
+                    state.guestUsingLocalFile = false;
+
+                    roomView.classList.add('hidden');
+                    lobbyView.classList.remove('hidden');
+                }
+
+                // ==========================================
+                // UPLOAD DE VÍDEO (LIMITE 5 GB + DRAG & DROP)
+                // ==========================================
+
+                function handleHostFileSelection(file) {
+                    if (state.role !== 'host' || !file) return;
+
+                    if (file.size > MAX_FILE_SIZE_BYTES) {
+                        const sizeGB = (file.size / (1024 * 1024 * 1024)).toFixed(2);
+                        showToast(
+                            'Arquivo Excede o Limite de 5 GB',
+                            `O arquivo selecionado possui ${sizeGB} GB. O limite máximo permitido nesta sala é de 5.00 GB.`,
+                            'error'
+                        );
+                        videoFileInput.value = '';
+                        return;
+                    }
+
+                    destroyYouTubePlayer();
+                    ytResultsDrawer.classList.add('hidden');
+
+                    if (state.currentVideoUrl) {
+                        try { URL.revokeObjectURL(state.currentVideoUrl); } catch (e) {}
+                    }
+
+                    const objectUrl = URL.createObjectURL(file);
+                    state.mediaMode = 'local';
+                    state.youtubeVideoId = null;
+                    state.currentVideoUrl = objectUrl;
+                    state.currentFileName = file.name;
+                    state.currentFileSize = file.size;
+
+                    videoPlaceholder.classList.add('hidden');
+                    videoEl.classList.remove('hidden');
+                    customControls.classList.remove('hidden');
+                    activeMediaFooter.classList.remove('hidden');
+
+                    activeFileName.textContent = file.name;
+                    activeFileSize.textContent = formatBytes(file.size);
+                    syncModeText.textContent = 'Transmitindo para a Sala';
+
+                    videoEl.srcObject = null;
+                    videoEl.src = objectUrl;
+                    videoEl.load();
+                    updatePlayPauseUI(true);
+
+                    uploadBtnLabel.textContent = 'Trocar Vídeo';
+                    fileInfoText.innerHTML = `Arquivo ativo: <strong class="text-emerald-400">${escapeHtml(file.name)}</strong> (${formatBytes(file.size)})`;
+
+                    broadcastToGuests({
+                        type: 'VIDEO_LOADED',
+                        fileName: file.name,
+                        fileSize: file.size
+                    });
+
+                    videoEl.onloadeddata = () => {
+                        streamVideoToAllGuests();
+                    };
+
+                    addSystemMessage(`Você carregou "${file.name}" (${formatBytes(file.size)}).`);
+                    showToast('Vídeo Pronto!', 'Dê Play para iniciar a sessão com todos os convidados.', 'success');
+                }
+
+                videoFileInput.addEventListener('change', (e) => {
+                    handleHostFileSelection(e.target.files[0]);
+                });
+
+                ytSearchInput.addEventListener('input', () => {
+                    if (ytSearchInput.value.trim().length > 0) {
+                        btnClearYtSearch.classList.remove('hidden');
+                    } else {
+                        btnClearYtSearch.classList.add('hidden');
+                    }
+                });
+
+                btnClearYtSearch.addEventListener('click', () => {
+                    ytSearchInput.value = '';
+                    btnClearYtSearch.classList.add('hidden');
+                    ytResultsDrawer.classList.add('hidden');
+                    ytSearchInput.focus();
+                });
+
+                btnCloseYtResults.addEventListener('click', () => {
+                    ytResultsDrawer.classList.add('hidden');
+                });
+
+                ytSearchForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    if (state.role !== 'host') return;
+                    const query = ytSearchInput.value.trim();
+                    if (!query) {
+                        showToast('Pesquisa Vazia', 'Digite o nome de um vídeo ou cole um link do YouTube.', 'warning');
+                        ytSearchInput.focus();
+                        return;
+                    }
+                    searchYouTubeVideos(query);
+                });
+
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    hostUploadPanel.addEventListener(eventName, (e) => {
+                        e.preventDefault();
+                        hostUploadPanel.classList.add('border-rose-500', 'bg-cinema-850');
+                    });
+                });
+
+                ['dragleave', 'drop'].forEach(eventName => {
+                    hostUploadPanel.addEventListener(eventName, (e) => {
+                        e.preventDefault();
+                        hostUploadPanel.classList.remove('border-rose-500', 'bg-cinema-850');
+                    });
+                });
+
+                hostUploadPanel.addEventListener('drop', (e) => {
+                    if (state.role !== 'host') return;
+                    const file = e.dataTransfer.files[0];
+                    if (file) handleHostFileSelection(file);
+                });
+
+                guestLocalFileInput.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (state.role !== 'guest' || !file) return;
+
+                    if (file.size > MAX_FILE_SIZE_BYTES) {
+                        showToast('Arquivo muito grande', 'O limite máximo é de 5.00 GB.', 'error');
+                        return;
+                    }
+
+                    if (state.activeMediaCall) {
+                        try { state.activeMediaCall.close(); } catch (err) {}
+                        state.activeMediaCall = null;
+                    }
+
+                    state.guestUsingLocalFile = true;
+                    const objectUrl = URL.createObjectURL(file);
+
+                    destroyYouTubePlayer();
+                    state.mediaMode = 'local';
+                    videoPlaceholder.classList.add('hidden');
+                    videoEl.classList.remove('hidden');
+                    customControls.classList.remove('hidden');
+                    activeMediaFooter.classList.remove('hidden');
+
+                    videoEl.srcObject = null;
+                    videoEl.src = objectUrl;
+                    videoEl.load();
+
+                    activeFileName.textContent = file.name;
+                    activeFileSize.textContent = formatBytes(file.size);
+                    syncModeText.textContent = 'Arquivo Local Sincronizado';
+                    guestLocalLabel.textContent = 'Trocar arquivo local';
+
+                    updateGuestBanner('local', `Reproduzindo cópia local <strong>"${escapeHtml(file.name)}"</strong> controlada pelo Host.`);
+                    updateVideoSyncOverlay('synced', 'Sincronizado com o Host');
+                    showToast('Modo Local Ativo', 'Seu vídeo local será pausado e avançado automaticamente pelos comandos do Host.', 'success');
+                });
+
+                // ==========================================
+                // CONTROLES DO PLAYER DE VÍDEO
+                // ==========================================
+
+                function updatePlayPauseUI(isPaused) {
+                    if (isPaused) {
+                        iconPlay.classList.remove('hidden');
+                        iconPause.classList.add('hidden');
+                    } else {
+                        iconPlay.classList.add('hidden');
+                        iconPause.classList.remove('hidden');
+                    }
+                }
+
+                btnPlayPause.addEventListener('click', () => {
+                    if (state.role !== 'host') return;
+
+                    if (state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.getPlayerState === 'function') {
+                        const ytState = state.ytPlayer.getPlayerState();
+                        const curr = state.ytPlayer.getCurrentTime ? state.ytPlayer.getCurrentTime() : 0;
+                        if (ytState !== 1) {
+                            state.ytPlayer.playVideo();
+                            updatePlayPauseUI(false);
+                            broadcastToGuests({ type: 'VIDEO_PLAY', currentTime: curr });
+                        } else {
+                            state.ytPlayer.pauseVideo();
+                            updatePlayPauseUI(true);
+                            broadcastToGuests({ type: 'VIDEO_PAUSE', currentTime: curr });
+                        }
+                        return;
+                    }
+
+                    if (!videoEl.src) return;
+                    if (videoEl.paused) {
+                        videoEl.play();
+                        updatePlayPauseUI(false);
+                        broadcastToGuests({ type: 'VIDEO_PLAY', currentTime: videoEl.currentTime });
+                    } else {
+                        videoEl.pause();
+                        updatePlayPauseUI(true);
+                        broadcastToGuests({ type: 'VIDEO_PAUSE', currentTime: videoEl.currentTime });
+                    }
+                });
+
+                videoEl.addEventListener('click', () => {
+                    if (state.role === 'host') {
+                        btnPlayPause.click();
+                    }
+                });
+
+                ytClickShield.addEventListener('click', () => {
+                    if (state.role === 'host') {
+                        btnPlayPause.click();
+                    }
+                });
+
+                btnRewind.addEventListener('click', () => {
+                    if (state.role !== 'host') return;
+
+                    if (state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.seekTo === 'function') {
+                        const target = Math.max(0, (state.ytPlayer.getCurrentTime() || 0) - 10);
+                        state.ytPlayer.seekTo(target, true);
+                        timeCurrent.textContent = formatTime(target);
+                        broadcastToGuests({ type: 'VIDEO_SEEK', currentTime: target });
+                        return;
+                    }
+
+                    if (!videoEl.src) return;
+                    videoEl.currentTime = Math.max(0, videoEl.currentTime - 10);
+                    broadcastToGuests({ type: 'VIDEO_SEEK', currentTime: videoEl.currentTime });
+                });
+
+                btnForward.addEventListener('click', () => {
+                    if (state.role !== 'host') return;
+
+                    if (state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.seekTo === 'function') {
+                        const dur = state.ytPlayer.getDuration() || 0;
+                        const target = Math.min(dur, (state.ytPlayer.getCurrentTime() || 0) + 10);
+                        state.ytPlayer.seekTo(target, true);
+                        timeCurrent.textContent = formatTime(target);
+                        broadcastToGuests({ type: 'VIDEO_SEEK', currentTime: target });
+                        return;
+                    }
+
+                    if (!videoEl.src) return;
+                    videoEl.currentTime = Math.min(videoEl.duration || 0, videoEl.currentTime + 10);
+                    broadcastToGuests({ type: 'VIDEO_SEEK', currentTime: videoEl.currentTime });
+                });
+
+                seekBar.addEventListener('input', () => {
+                    if (state.role !== 'host') return;
+                    const dur = state.mediaMode === 'youtube' && state.ytPlayer && state.ytPlayer.getDuration
+                        ? (state.ytPlayer.getDuration() || 0)
+                        : (videoEl.duration || 0);
+                    if (!dur) return;
+                    const seekTo = (seekBar.value / 100) * dur;
+                    timeCurrent.textContent = formatTime(seekTo);
+                });
+
+                seekBar.addEventListener('change', () => {
+                    if (state.role !== 'host') return;
+
+                    if (state.mediaMode === 'youtube' && state.ytPlayer && typeof state.ytPlayer.seekTo === 'function') {
+                        const dur = state.ytPlayer.getDuration() || 0;
+                        const seekTo = (seekBar.value / 100) * dur;
+                        state.ytPlayer.seekTo(seekTo, true);
+                        broadcastToGuests({ type: 'VIDEO_SEEK', currentTime: seekTo });
+                        return;
+                    }
+
+                    if (!videoEl.src) return;
+                    const seekTo = (seekBar.value / 100) * (videoEl.duration || 0);
+                    videoEl.currentTime = seekTo;
+                    broadcastToGuests({ type: 'VIDEO_SEEK', currentTime: seekTo });
+                });
+
+                videoEl.addEventListener('timeupdate', () => {
+                    if (!videoEl.duration || isNaN(videoEl.duration)) return;
+                    const progress = (videoEl.currentTime / videoEl.duration) * 100;
+                    seekBar.value = progress;
+                    timeCurrent.textContent = formatTime(videoEl.currentTime);
+                    timeDuration.textContent = formatTime(videoEl.duration);
+                });
+
+                videoEl.addEventListener('loadedmetadata', () => {
+                    if (videoEl.duration && !isNaN(videoEl.duration)) {
+                        timeDuration.textContent = formatTime(videoEl.duration);
+                    }
+                });
+
+                videoEl.addEventListener('ended', () => {
+                    updatePlayPauseUI(true);
+                    if (state.role === 'host') {
+                        broadcastToGuests({ type: 'VIDEO_PAUSE', currentTime: videoEl.duration });
+                    }
+                });
+
+                volumeBar.addEventListener('input', (e) => {
+                    const vol = parseFloat(e.target.value);
+                    videoEl.volume = vol;
+                    videoEl.muted = vol === 0;
+                    if (state.ytPlayer && typeof state.ytPlayer.setVolume === 'function') {
+                        try {
+                            state.ytPlayer.setVolume(Math.round(vol * 100));
+                            if (vol === 0) state.ytPlayer.mute();
+                            else state.ytPlayer.unMute();
+                        } catch (err) {}
+                    }
+                    updateVolumeIcon();
+                });
+
+                btnMute.addEventListener('click', () => {
+                    videoEl.muted = !videoEl.muted;
+                    if (!videoEl.muted && videoEl.volume === 0) {
+                        videoEl.volume = 0.5;
+                        volumeBar.value = 0.5;
+                    }
+                    if (state.ytPlayer && typeof state.ytPlayer.mute === 'function') {
+                        try {
+                            if (videoEl.muted) {
+                                state.ytPlayer.mute();
+                            } else {
+                                state.ytPlayer.unMute();
+                                state.ytPlayer.setVolume(Math.round(parseFloat(volumeBar.value) * 100));
+                            }
+                        } catch (err) {}
+                    }
+                    updateVolumeIcon();
+                });
+
+                function updateVolumeIcon() {
+                    if (videoEl.muted || videoEl.volume === 0) {
+                        iconVolHigh.classList.add('hidden');
+                        iconVolMute.classList.remove('hidden');
+                    } else {
+                        iconVolHigh.classList.remove('hidden');
+                        iconVolMute.classList.add('hidden');
+                    }
+                }
+
+                btnFullscreen.addEventListener('click', () => {
+                    try {
+                        const target = document.getElementById('player-wrapper');
+                        if (!document.fullscreenElement) {
+                            target.requestFullscreen().catch(() => {
+                                showToast('Tela Cheia', 'Seu navegador bloqueou o modo tela cheia automático.', 'info');
+                            });
+                        } else {
+                            document.exitFullscreen().catch(() => {});
+                        }
+                    } catch (e) {}
+                });
+
+                // ==========================================
+                // CHAT SINCRONIZADO EM TEMPO REAL
+                // ==========================================
+
+                function appendChatMessage(senderName, senderRole, text, isSelf) {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = `flex flex-col ${isSelf ? 'items-end' : 'items-start'}`;
+
+                    const roleTag = senderRole === 'host'
+                        ? `<span class="text-[10px] font-bold uppercase px-1.5 py-0.2 bg-rose-500/20 text-rose-400 rounded">Host</span>`
+                        : `<span class="text-[10px] font-semibold uppercase px-1.5 py-0.2 bg-indigo-500/20 text-indigo-300 rounded">Convidado</span>`;
+
+                    const timeStr = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+                    wrapper.innerHTML = `
+                        <div class="flex items-center gap-1.5 mb-1">
+                            <span class="text-xs font-semibold text-gray-300">${escapeHtml(senderName)}</span>
+                            ${roleTag}
+                            <span class="text-[10px] text-gray-500">${timeStr}</span>
+                        </div>
+                        <div class="max-w-[85%] px-3.5 py-2 rounded-2xl text-xs sm:text-sm leading-relaxed break-words ${
+                            isSelf
+                                ? 'bg-rose-600 text-white rounded-tr-sm'
+                                : 'bg-cinema-800 border border-cinema-700 text-gray-100 rounded-tl-sm'
+                        }">
+                            ${escapeHtml(text)}
+                        </div>
+                    `;
+
+                    chatMessages.appendChild(wrapper);
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }
+
+                function addSystemMessage(text) {
+                    const div = document.createElement('div');
+                    div.className = 'text-center my-1';
+                    div.innerHTML = `
+                        <span class="inline-block text-[11px] text-gray-400 bg-cinema-950/90 border border-cinema-800 px-3 py-1 rounded-full">
+                            ${escapeHtml(text)}
+                        </span>
+                    `;
+                    chatMessages.appendChild(div);
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }
+
+                chatForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const text = chatInput.value.trim();
+                    if (!text) return;
+
+                    appendChatMessage(state.username, state.role, text, true);
+
+                    if (state.role === 'host') {
+                        broadcastToGuests({
+                            type: 'CHAT_MESSAGE',
+                            username: state.username,
+                            role: 'host',
+                            text: text
+                        });
+                    } else {
+                        if (state.hostConnection && state.hostConnection.open) {
+                            state.hostConnection.send({
+                                type: 'CHAT_MESSAGE',
+                                username: state.username,
+                                text: text
+                            });
+                        } else if (state.broadcastChannel) {
+                            state.broadcastChannel.postMessage({
+                                target: 'host',
+                                senderId: state.localTabId,
+                                payload: {
+                                    type: 'CHAT_MESSAGE',
+                                    username: state.username,
+                                    text: text
+                                }
+                            });
+                        } else {
+                            showToast('Sem Conexão', 'Você não está conectado ao Host no momento.', 'warning');
+                        }
+                    }
+
+                    chatInput.value = '';
+                });
+
+                // ==========================================
+                // EVENTOS DO LOBBY E BOTÕES DE AÇÃO
+                // ==========================================
+
+                btnCreateRoom.addEventListener('click', () => {
+                    const code = generateRoomCode();
+                    enterRoom(code, 'host');
+                });
+
+                joinRoomForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const rawCode = roomCodeInput.value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+                    if (rawCode.length < 4) {
+                        showToast('Código Inválido', 'Digite um código de sala válido (ex: CINE99).', 'warning');
+                        roomCodeInput.focus();
+                        return;
+                    }
+                    enterRoom(rawCode, 'guest');
+                });
+
+                btnCopyCode.addEventListener('click', () => {
+                    if (state.roomCode) copyTextSafe(state.roomCode);
+                });
+
+                btnForceSync.addEventListener('click', () => {
+                    if (state.role !== 'host') return;
+                    if (state.mediaMode === 'youtube' && state.youtubeVideoId) {
+                        const curr = state.ytPlayer && state.ytPlayer.getCurrentTime ? state.ytPlayer.getCurrentTime() : 0;
+                        const ytState = state.ytPlayer && state.ytPlayer.getPlayerState ? state.ytPlayer.getPlayerState() : 1;
+                        broadcastToGuests({
+                            type: 'LOAD_YOUTUBE',
+                            videoId: state.youtubeVideoId,
+                            title: state.youtubeTitle,
+                            currentTime: curr,
+                            autoplay: ytState === 1
+                        });
+                        showToast('Sincronização Enviada', 'Vídeo do YouTube e tempo atual reenviados para todos os convidados.', 'success');
+                        return;
+                    }
+                    if (!state.currentVideoUrl) {
+                        showToast('Nenhum Vídeo', 'Pesquise um vídeo no YouTube ou carregue um arquivo primeiro antes de sincronizar.', 'warning');
+                        return;
+                    }
+                    streamVideoToAllGuests();
+                    broadcastToGuests({
+                        type: videoEl.paused ? 'VIDEO_PAUSE' : 'VIDEO_PLAY',
+                        currentTime: videoEl.currentTime
+                    });
+                    showToast('Sincronização Enviada', 'Transmissão e tempo atual reenviados para todos os convidados.', 'success');
+                });
+
+                btnReconnect.addEventListener('click', () => {
+                    if (state.role !== 'guest' || !state.roomCode) return;
+                    setNetworkStatus('connecting', 'Reconectando...');
+                    updateGuestBanner('connecting', `Tentando reconectar ao Host da sala <strong>${state.roomCode}</strong>...`);
+                    initGuestPeer();
+                });
+
+                btnLeaveRoom.addEventListener('click', leaveRoom);
+            });
+        })();
+    </script>
+</body>
+</html>
